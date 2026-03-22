@@ -6,7 +6,7 @@
         "DefineConstants": "UNITY_EDITOR"
     },
     "dotrush.roslyn.projectOrSolutionFiles": [
-        "/Users/dhruv/Documents/Game_Projects/NeutronSpaceGame/NeutronSpaceGame.sln"
+        "/Users/priyadarshisidhartha/Documents/GitHub/NeutronSpaceGame/NeutronSpaceGame.sln"
     ],
     "dotrush.roslyn.restoreProjectsBeforeLoading": false,
     "files.exclude": {
