@@ -1,0 +1,232 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &8141605214207941521
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1491048858232804780}
+  m_Layer: 0
+  m_Name: MuzzleLeft
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1491048858232804780
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8141605214207941521}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -1, y: 0.3, z: 6}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6813476219746151036}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &8614200737285328157
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2831460286434571728}
+  m_Layer: 0
+  m_Name: MuzzleRight
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2831460286434571728
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8614200737285328157}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 1, y: 0.3, z: 6}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6813476219746151036}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &5900726607522831506
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 1084186633786977632, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      propertyPath: m_Name
+      value: spaceship
+      objectReference: {fileID: 0}
+    - target: {fileID: 1111759172851103470, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1111759172851103470, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 1111759172851103470, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1111759172851103470, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1111759172851103470, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1111759172851103470, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1111759172851103470, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1111759172851103470, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1111759172851103470, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1111759172851103470, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects:
+    - targetCorrespondingSourceObject: {fileID: 1111759172851103470, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1491048858232804780}
+    - targetCorrespondingSourceObject: {fileID: 1111759172851103470, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2831460286434571728}
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 1084186633786977632, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7891335105558245875}
+    - targetCorrespondingSourceObject: {fileID: 1084186633786977632, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5326958608565334347}
+    - targetCorrespondingSourceObject: {fileID: 1084186633786977632, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8968434550229065760}
+    - targetCorrespondingSourceObject: {fileID: 1084186633786977632, guid: 68454c3376684487597b954e79b89e23, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 5023470810761355586}
+  m_SourcePrefab: {fileID: -4161369568681901532, guid: 68454c3376684487597b954e79b89e23, type: 3}
+--- !u!4 &6813476219746151036 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 1111759172851103470, guid: 68454c3376684487597b954e79b89e23, type: 3}
+  m_PrefabInstance: {fileID: 5900726607522831506}
+  m_PrefabAsset: {fileID: 0}
+--- !u!1 &6838815444518924786 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 1084186633786977632, guid: 68454c3376684487597b954e79b89e23, type: 3}
+  m_PrefabInstance: {fileID: 5900726607522831506}
+  m_PrefabAsset: {fileID: 0}
+--- !u!54 &7891335105558245875
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6838815444518924786}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
+--- !u!114 &5326958608565334347
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6838815444518924786}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b9db39e336e314ae6ab1e39f77e20b1c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpaceShooter.Player.PlayerShip
+  thrustSpeed: 25
+  strafeSpeed: 12
+  acceleration: 6
+  maxSpeed: 60
+  pitchYawSpeed: 90
+  rollSpeed: 75
+  mouseSensitivity: 0.5
+  rotationDamping: 8
+--- !u!114 &8968434550229065760
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6838815444518924786}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5dfbd9a306d5b4197aab6efaf41ea5fb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpaceShooter.Player.PlayerShooter
+  fireRate: 8
+  muzzlePoints:
+  - {fileID: 1491048858232804780}
+  - {fileID: 2831460286434571728}
+  damagePerBullet: 20
+  spreadAngle: 0
+  despawnTime: 4
+--- !u!114 &5023470810761355586
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6838815444518924786}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b45ceda3cfa74112ab5a1fb5ce9b19d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpaceShooter.Player.PlayerHealth
+  maxHealth: 100
+  maxShields: 50
+  shieldRegenDelay: 3
+  shieldRegenRate: 10
+  invincibilityDuration: 1
