@@ -35,6 +35,23 @@ namespace SpaceShooter.Player
         [Tooltip("How far ahead of the ship the camera looks (depth)")]
         [SerializeField] private float lookAheadDistance = 5f;
 
+        [Header("Camera Shake")]
+        [Tooltip("Constant shake intensity while thrusting")]
+        [SerializeField] private float thrustShakeIntensity = 0.05f;
+        [Tooltip("How fast the shake vibrates")]
+        [SerializeField] private float thrustShakeSpeed = 20f;
+        [Tooltip("Initial burst of shake when thrust is first applied")]
+        [SerializeField] private float initialPulseIntensity = 0.3f;
+        [Tooltip("How fast the initial pulse fades out")]
+        [SerializeField] private float pulseDecayRate = 5f;
+
+        // ── Runtime ───────────────────────────────────────────────────────────
+        private PlayerShip _playerShip;
+        private Vector3 _smoothedPosition;
+        private Quaternion _smoothedRotation;
+        private float _currentPulse;
+        private bool _wasThrusting;
+
         // ── Unity lifecycle ───────────────────────────────────────────────────
         private void Awake()
         {
@@ -44,30 +61,43 @@ namespace SpaceShooter.Player
                 var playerGO = GameObject.FindWithTag("Player");
                 if (playerGO != null) target = playerGO.transform;
             }
+
+            if (target != null)
+                _playerShip = target.GetComponent<PlayerShip>();
         }
 
         private void LateUpdate()
         {
             if (target == null) return;
 
+            // Initialize smoothed vectors if this is the first frame
+            if (_smoothedPosition == Vector3.zero)
+            {
+                _smoothedPosition = transform.position;
+                _smoothedRotation = transform.rotation;
+            }
+
             UpdatePosition();
             UpdateRotation();
+
+            // Set base position before shake
+            transform.position = _smoothedPosition;
+            transform.rotation = _smoothedRotation;
+
+            if (_playerShip != null)
+                ApplyShake();
         }
 
         // ── Camera logic ──────────────────────────────────────────────────────
         private void UpdatePosition()
         {
-            // Desired position = behind and above the ship using its own local axes
-            // target.forward  = direction the nose points
-            // target.up       = direction the cockpit faces
             Vector3 desiredPosition =
                 target.position
-                - target.forward * followDistance    // pull back along ship's nose
-                + target.up      * heightOffset;     // lift up along ship's local up
+                - target.forward * followDistance
+                + target.up      * heightOffset;
 
-            // Smooth damp toward desired position
-            transform.position = Vector3.Lerp(
-                transform.position,
+            _smoothedPosition = Vector3.Lerp(
+                _smoothedPosition,
                 desiredPosition,
                 positionDamping * Time.deltaTime
             );
@@ -75,23 +105,55 @@ namespace SpaceShooter.Player
 
         private void UpdateRotation()
         {
-            // Look at a point slightly ahead of the ship, not just the ship pivot.
-            // This prevents the noisy jitter you get when looking exactly at the origin.
             Vector3 lookTarget = target.position + target.forward * lookAheadDistance;
-
-            // Build a look-rotation using the ship's own up axis.
-            // This is what gives the horizon-free / space feel — we use target.up
-            // instead of Vector3.up, so the camera rolls with the ship.
             Quaternion desiredRotation = Quaternion.LookRotation(
-                lookTarget - transform.position,    // direction to look
-                target.up                           // ← ship's local up, NOT world up
+                lookTarget - _smoothedPosition,
+                target.up
             );
 
-            transform.rotation = Quaternion.Slerp(
-                transform.rotation,
+            _smoothedRotation = Quaternion.Slerp(
+                _smoothedRotation,
                 desiredRotation,
                 rotationDamping * Time.deltaTime
             );
+        }
+
+        private void ApplyShake()
+        {
+            bool isThrusting = _playerShip.ThrustInput > 0.05f;
+
+            // Trigger pulse if we just started thrusting
+            if (isThrusting && !_wasThrusting)
+            {
+                _currentPulse = initialPulseIntensity;
+            }
+            _wasThrusting = isThrusting;
+
+            // Decay the pulse
+            _currentPulse = Mathf.MoveTowards(_currentPulse, 0f, pulseDecayRate * Time.deltaTime);
+
+            // Calculate active noise based on sustained thrust + the decaying pulse
+            float activeShake = isThrusting ? (thrustShakeIntensity * _playerShip.ThrustInput) : 0f;
+            float totalShake = _currentPulse + activeShake;
+
+            if (totalShake > 0.001f)
+            {
+                // Generate layered Perlin noise mapped from 0..1 to -1..1
+                Vector3 noise = new Vector3(
+                    Mathf.PerlinNoise(Time.time * thrustShakeSpeed, 0f) - 0.5f,
+                    Mathf.PerlinNoise(0f, Time.time * thrustShakeSpeed) - 0.5f,
+                    Mathf.PerlinNoise(Time.time * thrustShakeSpeed, Time.time * thrustShakeSpeed) - 0.5f
+                ) * 2f;
+
+                transform.position += noise * totalShake;
+                
+                // Add a tiny bit of rotational shake for extra impact
+                transform.rotation *= Quaternion.Euler(
+                    noise.x * totalShake * 10f,
+                    noise.y * totalShake * 10f,
+                    noise.z * totalShake * 10f
+                );
+            }
         }
 
         // ── Editor helper — draw the follow gizmo ─────────────────────────────

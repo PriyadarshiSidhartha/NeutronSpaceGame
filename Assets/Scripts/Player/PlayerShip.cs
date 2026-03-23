@@ -207,5 +207,6 @@ namespace SpaceShooter.Player
 
         // ── Public API ────────────────────────────────────────────────────────
         public Vector2 MoveInput => new Vector2(_yaw, _pitch);
+        public float ThrustInput => _thrust;
     }
 }
