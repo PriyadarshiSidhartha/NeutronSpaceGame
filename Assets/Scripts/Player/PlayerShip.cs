@@ -26,6 +26,8 @@ namespace SpaceShooter.Player
         [SerializeField] private float strafeSpeed = 12f;
         [Tooltip("How quickly the ship accelerates toward input velocity")]
         [SerializeField] private float acceleration = 6f;
+        [Tooltip("How quickly the ship slows down over time (drag)")]
+        [SerializeField] private float movementDrag = 2.5f;
         [Tooltip("Maximum speed the ship can reach")]
         [SerializeField] private float maxSpeed = 60f;
 
@@ -39,8 +41,17 @@ namespace SpaceShooter.Player
         [Tooltip("How quickly the ship damps its angular velocity")]
         [SerializeField] private float rotationDamping = 8f;
 
+        [Header("Visuals (Optional)")]
+        [Tooltip("Child transform containing the ship mesh to apply sway to")]
+        [SerializeField] private Transform shipModel;
+        [Tooltip("Amount of visual tilt when strafing/moving vertically")]
+        [SerializeField] private float swayAmount = 15f;
+        [Tooltip("How fast the sway interpolates")]
+        [SerializeField] private float swaySpeed = 5f;
+
         // ── Runtime ───────────────────────────────────────────────────────────
         private Rigidbody _rb;
+        private Quaternion _initialModelRot;
         private Vector3 _targetVelocity;
         private Vector3 _currentAngularInput; // pitch, yaw, roll per frame
 
@@ -51,7 +62,7 @@ namespace SpaceShooter.Player
             if (_rb != null)
             {
                 _rb.useGravity = false;
-                _rb.linearDamping = 0f;  // No drag — inertia is preserved
+                _rb.linearDamping = movementDrag;  // Applies atmospheric drag to smooth out sliding
                 _rb.angularDamping = rotationDamping;
                 _rb.interpolation = RigidbodyInterpolation.Interpolate;
                 _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
@@ -62,11 +73,34 @@ namespace SpaceShooter.Player
             // Lock & hide cursor for mouse-look
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
+
+            // Auto-assign ship model if empty
+            if (shipModel == null)
+            {
+                var renderer = GetComponentInChildren<MeshRenderer>();
+                if (renderer != null && renderer.transform != this.transform)
+                    shipModel = renderer.transform;
+            }
+
+            if (shipModel != null)
+                _initialModelRot = shipModel.localRotation;
         }
 
         private void Update()
         {
             ReadInput();
+            ApplySway();
+        }
+
+        private void ApplySway()
+        {
+            if (shipModel == null) return;
+
+            // Strafe right (strafe > 0) -> roll right (negative Z)
+            float targetRoll = -_strafe * swayAmount;
+
+            Quaternion targetRotation = _initialModelRot * Quaternion.Euler(0f, 0f, targetRoll);
+            shipModel.localRotation = Quaternion.Slerp(shipModel.localRotation, targetRotation, Time.deltaTime * swaySpeed);
         }
 
         private void FixedUpdate()
@@ -93,21 +127,21 @@ namespace SpaceShooter.Player
                 // Forward thrust — Space only, no backward
                 if (Keyboard.current.spaceKey.isPressed) _thrust += 1f;
 
-                // Pitch — W/S
-                if (Keyboard.current.wKey.isPressed) _pitch += 1f;  // W = pitch down
-                if (Keyboard.current.sKey.isPressed) _pitch -= 1f;  // S = pitch up
+                // Pitch — W/S (Inverted)
+                if (Keyboard.current.wKey.isPressed) _pitch -= 1f;  // W = pitch up
+                if (Keyboard.current.sKey.isPressed) _pitch += 1f;  // S = pitch down
 
-                // Roll — A/D tilt left/right
-                if (Keyboard.current.aKey.isPressed) _roll += 1f;  // A = tilt right
-                if (Keyboard.current.dKey.isPressed) _roll -= 1f;  // D = tilt left
+                // Roll — A/D tilt left/right (Inverted)
+                if (Keyboard.current.aKey.isPressed) _roll -= 1f;  // A = tilt left
+                if (Keyboard.current.dKey.isPressed) _roll += 1f;  // D = tilt right
             }
 
             // ── Mouse ─────────────────────────────────────────────────────────
             if (Mouse.current != null)
             {
                 Vector2 mouseDelta = Mouse.current.delta.ReadValue();
-                _pitch -= mouseDelta.y * mouseSensitivity;   // mouse up  = pitch up
-                _yaw   += mouseDelta.x * mouseSensitivity;   // mouse right = yaw right
+                _pitch += mouseDelta.y * mouseSensitivity;   // mouse up  = pitch down
+                _yaw += mouseDelta.x * mouseSensitivity;   // mouse right = yaw right
             }
 
             // ── Gamepad ───────────────────────────────────────────────────────
@@ -116,13 +150,13 @@ namespace SpaceShooter.Player
                 Vector2 leftStick = Gamepad.current.leftStick.ReadValue();
                 Vector2 rightStick = Gamepad.current.rightStick.ReadValue();
 
-                _pitch += leftStick.y * pitchYawSpeed * Time.deltaTime;
-                _yaw += leftStick.x * pitchYawSpeed * Time.deltaTime;
-                _strafe += rightStick.x * strafeSpeed;
-                _vertical += rightStick.y * strafeSpeed;
+                _pitch -= rightStick.y * pitchYawSpeed * Time.deltaTime;
+                _yaw += rightStick.x * pitchYawSpeed * Time.deltaTime;
+                _strafe += leftStick.x * strafeSpeed;
+                _vertical += leftStick.y * strafeSpeed;
                 _thrust += Gamepad.current.rightTrigger.ReadValue(); // forward only
-                _roll -= Gamepad.current.leftShoulder.isPressed  ? 1f : 0f;
-                _roll += Gamepad.current.rightShoulder.isPressed ? 1f : 0f;
+                _roll += Gamepad.current.leftShoulder.isPressed ? 1f : 0f;
+                _roll -= Gamepad.current.rightShoulder.isPressed ? 1f : 0f;
             }
         }
 

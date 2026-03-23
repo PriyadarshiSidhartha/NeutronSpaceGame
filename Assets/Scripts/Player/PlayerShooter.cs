@@ -51,7 +51,7 @@ namespace SpaceShooter.Player
             if (Mouse.current != null && Mouse.current.leftButton.isPressed)
                 _isFiring = true;
 
-            if (Gamepad.current != null && Gamepad.current.buttonSouth.isPressed)
+            if (Gamepad.current != null && Gamepad.current.leftTrigger.isPressed)
                 _isFiring = true;
         }
 
