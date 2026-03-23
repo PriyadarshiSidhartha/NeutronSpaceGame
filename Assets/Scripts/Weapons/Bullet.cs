@@ -16,7 +16,6 @@ namespace SpaceShooter.Weapons
 
         // ── Runtime ───────────────────────────────────────────────────────────
         private int       _damage;
-        private bool      _isPlayerBullet;
         private Vector3   _inheritedVelocity;   // ship velocity baked in at spawn
         private Vector3   _fireDirection;       // world-space travel direction, decoupled from visual rotation
         private Rigidbody _rb;
@@ -56,9 +55,8 @@ namespace SpaceShooter.Weapons
 
         private void OnTriggerEnter(Collider other)
         {
-            // Don't hit the owner's layer
-            if (_isPlayerBullet && other.CompareTag("Player"))  return;
-            if (!_isPlayerBullet && other.CompareTag("Enemy"))  return;
+            // Don't hit the owner's layer (placeholder for multiplayer collision matrix)
+            if (other.CompareTag("Player"))  return;
 
             if (other.TryGetComponent<IHittable>(out var target))
             {
@@ -72,12 +70,11 @@ namespace SpaceShooter.Weapons
         /// <summary>Called by the shooter to set up the bullet before enabling it.</summary>
         /// <param name="fireDirection">True world-space travel direction. Pass explicitly so the
         /// visual rotation (set via transform) can be offset independently.</param>
-        public void Initialize(int damage, bool isPlayerBullet,
+        public void Initialize(int damage,
                                Vector3 inheritedVelocity = default,
                                Vector3 fireDirection     = default)
         {
             _damage            = damage;
-            _isPlayerBullet    = isPlayerBullet;
             _inheritedVelocity = inheritedVelocity;
             // Fall back to transform.forward if caller doesn't supply a direction
             _fireDirection     = (fireDirection == default || fireDirection == Vector3.zero)

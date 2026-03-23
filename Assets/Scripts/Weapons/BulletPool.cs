@@ -4,9 +4,9 @@ using UnityEngine.Pool;
 namespace SpaceShooter.Weapons
 {
     /// <summary>
-    /// Singleton object pool for player and enemy bullets.
+    /// Singleton object pool for player bullets.
     /// Attach to an empty GameObject in the scene called "BulletPool".
-    /// Assign the player and enemy bullet prefabs in the Inspector.
+    /// Assign the player bullet prefab in the Inspector.
     /// </summary>
     public class BulletPool : MonoBehaviour
     {
@@ -14,14 +14,12 @@ namespace SpaceShooter.Weapons
 
         [Header("Prefabs")]
         [SerializeField] private GameObject playerBulletPrefab;
-        [SerializeField] private GameObject enemyBulletPrefab;
 
         [Header("Pool Settings")]
         [SerializeField] private int defaultCapacity = 30;
         [SerializeField] private int maxSize         = 100;
 
         private ObjectPool<GameObject> _playerPool;
-        private ObjectPool<GameObject> _enemyPool;
 
         // ── Unity lifecycle ───────────────────────────────────────────────────
         private void Awake()
@@ -48,16 +46,6 @@ namespace SpaceShooter.Weapons
                 defaultCapacity:  defaultCapacity,
                 maxSize:          maxSize
             );
-
-            _enemyPool = new ObjectPool<GameObject>(
-                createFunc:       () => CreateBullet(enemyBulletPrefab),
-                actionOnGet:      go => { },              // caller sets position/rotation BEFORE enabling
-                actionOnRelease:  go => go.SetActive(false),
-                actionOnDestroy:  go => Destroy(go),
-                collectionCheck:  false,
-                defaultCapacity:  defaultCapacity,
-                maxSize:          maxSize
-            );
         }
 
         private GameObject CreateBullet(GameObject prefab)
@@ -70,8 +58,5 @@ namespace SpaceShooter.Weapons
         // ── Public API ────────────────────────────────────────────────────────
         public GameObject GetPlayerBullet()  => _playerPool.Get();
         public void ReturnPlayerBullet(GameObject go) => _playerPool.Release(go);
-
-        public GameObject GetEnemyBullet()   => _enemyPool.Get();
-        public void ReturnEnemyBullet(GameObject go)  => _enemyPool.Release(go);
     }
 }

@@ -52,7 +52,7 @@ namespace SpaceShooter.Player
             {
                 _rb.useGravity = false;
                 _rb.linearDamping = 0f;  // No drag — inertia is preserved
-                _rb.angularDamping = 4f;
+                _rb.angularDamping = rotationDamping;
                 _rb.interpolation = RigidbodyInterpolation.Interpolate;
                 _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
                 // No rotation constraints — we handle rotation manually
@@ -159,13 +159,16 @@ namespace SpaceShooter.Player
 
         private void ApplyRotation()
         {
-            // Build a rotation delta from our inputs this frame
-            float pitchDeg = _pitch * pitchYawSpeed * Time.fixedDeltaTime;
-            float yawDeg = _yaw * pitchYawSpeed * Time.fixedDeltaTime;
-            float rollDeg = _roll * rollSpeed * Time.fixedDeltaTime;
+            // Calculate torque from inputs. We no longer need Time.fixedDeltaTime 
+            // since the physics engine handles integration when applying forces.
+            Vector3 torque = new Vector3(
+                _pitch * pitchYawSpeed,
+                _yaw * pitchYawSpeed,
+                _roll * rollSpeed
+            );
 
-            // Apply in LOCAL space so it's always relative to where the ship faces
-            transform.Rotate(pitchDeg, yawDeg, rollDeg, Space.Self);
+            // Add relative torque (local space) to achieve heavy, physics-based drifting
+            _rb.AddRelativeTorque(torque, ForceMode.Acceleration);
         }
 
         // ── Public API ────────────────────────────────────────────────────────

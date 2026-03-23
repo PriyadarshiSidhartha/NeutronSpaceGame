@@ -119,7 +119,6 @@ namespace SpaceShooter.Player
             //    affected by the visual rotation offset
             if (bulletGO.TryGetComponent<Weapons.Bullet>(out var bullet))
                 bullet.Initialize(damagePerBullet,
-                                  isPlayerBullet: true,
                                   inheritedVelocity: _rb != null ? _rb.linearVelocity : Vector3.zero,
                                   fireDirection: direction);
 

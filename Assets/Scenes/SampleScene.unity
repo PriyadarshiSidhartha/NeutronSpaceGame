@@ -637,7 +637,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SpaceShooter.Weapons.BulletPool
   playerBulletPrefab: {fileID: 3047311978253597339, guid: 118eef76adf194421a94b1f04e35a606, type: 3}
-  enemyBulletPrefab: {fileID: 3047311978253597339, guid: 118eef76adf194421a94b1f04e35a606, type: 3}
   defaultCapacity: 30
   maxSize: 100
 --- !u!4 &670016767
