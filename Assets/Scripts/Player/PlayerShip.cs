@@ -49,11 +49,27 @@ namespace SpaceShooter.Player
         [Tooltip("How fast the sway interpolates")]
         [SerializeField] private float swaySpeed = 5f;
 
+        [Header("Thruster Visuals")]
+        [Tooltip("Renderers for the thruster flames")]
+        [SerializeField] private Renderer[] thrusterRenderers;
+        [Tooltip("The base emission color of the thruster")]
+        [ColorUsage(false, true)] [SerializeField] private Color thrusterBaseColor = Color.cyan;
+        [Tooltip("Emission intensity when idle")]
+        [SerializeField] private float idleEmissionMultiplier = 0.5f;
+        [Tooltip("Emission intensity when strafing/rotating/rolling")]
+        [SerializeField] private float moveEmissionMultiplier = 5f;
+        [Tooltip("Emission intensity when throttling forward")]
+        [SerializeField] private float thrustEmissionMultiplier = 20f;
+        [Tooltip("How fast the emission changes")]
+        [SerializeField] private float emissionLerpSpeed = 10f;
+
         // ── Runtime ───────────────────────────────────────────────────────────
         private Rigidbody _rb;
         private Quaternion _initialModelRot;
         private Vector3 _targetVelocity;
         private Vector3 _currentAngularInput; // pitch, yaw, roll per frame
+        private Material[] _thrusterMaterials;
+        private float _currentEmissionIntensity;
 
         // ── Unity lifecycle ───────────────────────────────────────────────────
         private void Awake()
@@ -84,12 +100,26 @@ namespace SpaceShooter.Player
 
             if (shipModel != null)
                 _initialModelRot = shipModel.localRotation;
+
+            if (thrusterRenderers != null && thrusterRenderers.Length > 0)
+            {
+                _thrusterMaterials = new Material[thrusterRenderers.Length];
+                for (int i = 0; i < thrusterRenderers.Length; i++)
+                {
+                    if (thrusterRenderers[i] != null)
+                    {
+                        _thrusterMaterials[i] = thrusterRenderers[i].material;
+                        _thrusterMaterials[i].EnableKeyword("_EMISSION");
+                    }
+                }
+            }
         }
 
         private void Update()
         {
             ReadInput();
             ApplySway();
+            UpdateThrusterVisuals();
         }
 
         private void ApplySway()
@@ -101,6 +131,30 @@ namespace SpaceShooter.Player
 
             Quaternion targetRotation = _initialModelRot * Quaternion.Euler(0f, 0f, targetRoll);
             shipModel.localRotation = Quaternion.Slerp(shipModel.localRotation, targetRotation, Time.deltaTime * swaySpeed);
+        }
+
+        private void UpdateThrusterVisuals()
+        {
+            if (_thrusterMaterials == null || _thrusterMaterials.Length == 0) return;
+
+            bool isThrusting = _thrust > 0.01f;
+            bool isMovingWithoutThrust = Mathf.Abs(_strafe) > 0.01f || Mathf.Abs(_vertical) > 0.01f || 
+                                         Mathf.Abs(_pitch) > 0.01f || Mathf.Abs(_yaw) > 0.01f || Mathf.Abs(_roll) > 0.01f;
+
+            float targetEmission = idleEmissionMultiplier;
+            if (isThrusting) targetEmission = thrustEmissionMultiplier;
+            else if (isMovingWithoutThrust) targetEmission = moveEmissionMultiplier;
+
+            _currentEmissionIntensity = Mathf.Lerp(_currentEmissionIntensity, targetEmission, Time.deltaTime * emissionLerpSpeed);
+
+            // Apply to the material's emission color property
+            foreach (var mat in _thrusterMaterials)
+            {
+                if (mat != null)
+                {
+                    mat.SetColor("_EmissionColor", thrusterBaseColor * _currentEmissionIntensity);
+                }
+            }
         }
 
         private void FixedUpdate()

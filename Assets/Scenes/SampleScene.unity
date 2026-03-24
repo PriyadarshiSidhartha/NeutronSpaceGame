@@ -459,6 +459,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: trail (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 2453470313807851061, guid: 96d8062bcbd584a64a875b7dc879d564, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 5211060678442085885, guid: 96d8062bcbd584a64a875b7dc879d564, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -1188,6 +1192,42 @@ PrefabInstance:
       propertyPath: autoBankAmount
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: thrusterRenderer
+      value: 
+      objectReference: {fileID: 1859524797}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: thrusterBaseColor.b
+      value: 0.103773594
+      objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: thrusterBaseColor.g
+      value: 0.059653502
+      objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: thrusterBaseColor.r
+      value: 0.02104842
+      objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: moveEmissionMultiplier
+      value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: thrustEmissionMultiplier
+      value: 100
+      objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: thrusterRenderers.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: 'thrusterRenderers.Array.data[0]'
+      value: 
+      objectReference: {fileID: 1859524797}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: 'thrusterRenderers.Array.data[1]'
+      value: 
+      objectReference: {fileID: 1774684233}
     - target: {fileID: 6813476219746151036, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0
@@ -1418,6 +1458,11 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1083709728916934959, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
   m_PrefabInstance: {fileID: 807245371}
   m_PrefabAsset: {fileID: 0}
+--- !u!23 &1774684233 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 5976811672447297044, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+  m_PrefabInstance: {fileID: 807245371}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1852832004
 GameObject:
   m_ObjectHideFlags: 0
@@ -1530,6 +1575,11 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!23 &1859524797 stripped
+MeshRenderer:
+  m_CorrespondingSourceObject: {fileID: 4022607409715137691, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+  m_PrefabInstance: {fileID: 807245371}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &2103742850
 GameObject:
   m_ObjectHideFlags: 0
@@ -1672,6 +1722,10 @@ PrefabInstance:
     - target: {fileID: 2453470313807851061, guid: 96d8062bcbd584a64a875b7dc879d564, type: 3}
       propertyPath: m_Name
       value: trail
+      objectReference: {fileID: 0}
+    - target: {fileID: 2453470313807851061, guid: 96d8062bcbd584a64a875b7dc879d564, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5211060678442085885, guid: 96d8062bcbd584a64a875b7dc879d564, type: 3}
       propertyPath: m_LocalPosition.x
