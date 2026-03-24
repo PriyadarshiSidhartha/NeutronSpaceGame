@@ -32,20 +32,26 @@ namespace SpaceShooter.Player
         [SerializeField] private float maxSpeed = 60f;
 
         [Header("Rotation")]
-        [Tooltip("Pitch & yaw sensitivity (degrees/sec)")]
+        [Tooltip("Max pitch & yaw speed (degrees/sec)")]
         [SerializeField] private float pitchYawSpeed = 90f;
-        [Tooltip("Roll sensitivity (degrees/sec)")]
+        [Tooltip("Max roll speed (degrees/sec)")]
         [SerializeField] private float rollSpeed = 75f;
         [Tooltip("Mouse sensitivity multiplier")]
         [SerializeField] private float mouseSensitivity = 0.5f;
-        [Tooltip("How quickly the ship damps its angular velocity")]
-        [SerializeField] private float rotationDamping = 8f;
+
+        [Header("Rotation Dynamics")]
+        [Tooltip("How fast the ship accelerates into a spin (degrees/sec^2). Higher = snappier attack.")]
+        [SerializeField] private float rotationAcceleration = 360f;
+        [Tooltip("How quickly the ship loses angular velocity (stops spinning) when there is no input. Lower = more sustain/drift. Higher = quicker stop.")]
+        [SerializeField] private float rotationDrag = 8f;
 
         [Header("Visuals (Optional)")]
         [Tooltip("Child transform containing the ship mesh to apply sway to")]
         [SerializeField] private Transform shipModel;
-        [Tooltip("Amount of visual tilt when strafing/moving vertically")]
+        [Tooltip("Amount of visual tilt when strafing horizontally")]
         [SerializeField] private float swayAmount = 15f;
+        [Tooltip("Amount of visual bank when turning left/right (yaw bank)")]
+        [SerializeField] private float turnSwayMultiplier = 10f;
         [Tooltip("How fast the sway interpolates")]
         [SerializeField] private float swaySpeed = 5f;
 
@@ -79,7 +85,7 @@ namespace SpaceShooter.Player
             {
                 _rb.useGravity = false;
                 _rb.linearDamping = movementDrag;  // Applies atmospheric drag to smooth out sliding
-                _rb.angularDamping = rotationDamping;
+                _rb.angularDamping = rotationDrag;
                 _rb.interpolation = RigidbodyInterpolation.Interpolate;
                 _rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
                 // No rotation constraints — we handle rotation manually
@@ -108,8 +114,12 @@ namespace SpaceShooter.Player
                 {
                     if (thrusterRenderers[i] != null)
                     {
-                        _thrusterMaterials[i] = thrusterRenderers[i].material;
-                        _thrusterMaterials[i].EnableKeyword("_EMISSION");
+                        Material[] mats = thrusterRenderers[i].materials;
+                        if (mats.Length > 1)
+                        {
+                            _thrusterMaterials[i] = mats[1];
+                            _thrusterMaterials[i].EnableKeyword("_EMISSION");
+                        }
                     }
                 }
             }
@@ -124,12 +134,19 @@ namespace SpaceShooter.Player
 
         private void ApplySway()
         {
-            if (shipModel == null) return;
+            if (shipModel == null || _rb == null) return;
 
-            // Strafe right (strafe > 0) -> roll right (negative Z)
-            float targetRoll = -_strafe * swayAmount;
+            // 1. Strafe right (strafe > 0) -> roll right (negative Z)
+            float strafeBank = -_strafe * swayAmount;
 
-            Quaternion targetRotation = _initialModelRot * Quaternion.Euler(0f, 0f, targetRoll);
+            // 2. Yaw right (local angular velocity Y > 0) -> bank right (negative Z)
+            float localYawVelocity = transform.InverseTransformDirection(_rb.angularVelocity).y;
+            float turnBank = -localYawVelocity * turnSwayMultiplier;
+
+            // Combine the two banks seamlessly, clamped to prevent extreme flipping if they max out both!
+            float totalTargetRoll = Mathf.Clamp(strafeBank + turnBank, -70f, 70f);
+
+            Quaternion targetRotation = _initialModelRot * Quaternion.Euler(0f, 0f, totalTargetRoll);
             shipModel.localRotation = Quaternion.Slerp(shipModel.localRotation, targetRotation, Time.deltaTime * swaySpeed);
         }
 
@@ -139,7 +156,8 @@ namespace SpaceShooter.Player
 
             bool isThrusting = _thrust > 0.01f;
             bool isMovingWithoutThrust = Mathf.Abs(_strafe) > 0.01f || Mathf.Abs(_vertical) > 0.01f || 
-                                         Mathf.Abs(_pitch) > 0.01f || Mathf.Abs(_yaw) > 0.01f || Mathf.Abs(_roll) > 0.01f;
+                                         Mathf.Abs(_stickPitch) > 0.01f || Mathf.Abs(_stickYaw) > 0.01f || Mathf.Abs(_stickRoll) > 0.01f ||
+                                         Mathf.Abs(_mousePitchAccumulated) > 0.01f || Mathf.Abs(_mouseYawAccumulated) > 0.01f;
 
             float targetEmission = idleEmissionMultiplier;
             if (isThrusting) targetEmission = thrustEmissionMultiplier;
@@ -164,16 +182,22 @@ namespace SpaceShooter.Player
         }
 
         // ── Input ─────────────────────────────────────────────────────────────
-        private float _thrust, _strafe, _vertical, _pitch, _yaw, _roll;
+        private float _thrust, _strafe, _vertical;
+        
+        // Continuous input axes (Keyboard, Gamepad stick)
+        private float _stickPitch, _stickYaw, _stickRoll;
+        
+        // Accumulated mouse deltas (to sync Update with FixedUpdate without jitter)
+        private float _mousePitchAccumulated, _mouseYawAccumulated;
 
         private void ReadInput()
         {
             _thrust = 0f;
             _strafe = 0f;
             _vertical = 0f;
-            _pitch = 0f;
-            _yaw = 0f;
-            _roll = 0f;
+            _stickPitch = 0f;
+            _stickYaw = 0f;
+            _stickRoll = 0f;
 
             // ── Keyboard ──────────────────────────────────────────────────────
             if (Keyboard.current != null)
@@ -182,20 +206,22 @@ namespace SpaceShooter.Player
                 if (Keyboard.current.spaceKey.isPressed) _thrust += 1f;
 
                 // Pitch — W/S (Inverted)
-                if (Keyboard.current.wKey.isPressed) _pitch -= 1f;  // W = pitch up
-                if (Keyboard.current.sKey.isPressed) _pitch += 1f;  // S = pitch down
+                if (Keyboard.current.wKey.isPressed) _stickPitch -= 1f;  // W = pitch up
+                if (Keyboard.current.sKey.isPressed) _stickPitch += 1f;  // S = pitch down
 
                 // Roll — A/D tilt left/right (Inverted)
-                if (Keyboard.current.aKey.isPressed) _roll -= 1f;  // A = tilt left
-                if (Keyboard.current.dKey.isPressed) _roll += 1f;  // D = tilt right
+                if (Keyboard.current.aKey.isPressed) _stickRoll -= 1f;  // A = tilt left
+                if (Keyboard.current.dKey.isPressed) _stickRoll += 1f;  // D = tilt right
             }
 
             // ── Mouse ─────────────────────────────────────────────────────────
             if (Mouse.current != null)
             {
                 Vector2 mouseDelta = Mouse.current.delta.ReadValue();
-                _pitch += mouseDelta.y * mouseSensitivity;   // mouse up  = pitch down
-                _yaw += mouseDelta.x * mouseSensitivity;   // mouse right = yaw right
+                // Accumulate mouse deltas to apply them perfectly in fixed intervals without losing input.
+                // Scaled slightly so standard sensitivity feels reasonable against stick input.
+                _mousePitchAccumulated += mouseDelta.y * mouseSensitivity * 0.1f;
+                _mouseYawAccumulated += mouseDelta.x * mouseSensitivity * 0.1f;
             }
 
             // ── Gamepad ───────────────────────────────────────────────────────
@@ -204,13 +230,13 @@ namespace SpaceShooter.Player
                 Vector2 leftStick = Gamepad.current.leftStick.ReadValue();
                 Vector2 rightStick = Gamepad.current.rightStick.ReadValue();
 
-                _pitch -= rightStick.y * pitchYawSpeed * Time.deltaTime;
-                _yaw += rightStick.x * pitchYawSpeed * Time.deltaTime;
-                _strafe += leftStick.x * strafeSpeed;
-                _vertical += leftStick.y * strafeSpeed;
+                _stickPitch -= rightStick.y;
+                _stickYaw += rightStick.x;
+                _strafe += leftStick.x;
+                _vertical += leftStick.y;
                 _thrust += Gamepad.current.rightTrigger.ReadValue(); // forward only
-                _roll += Gamepad.current.leftShoulder.isPressed ? 1f : 0f;
-                _roll -= Gamepad.current.rightShoulder.isPressed ? 1f : 0f;
+                _stickRoll += Gamepad.current.leftShoulder.isPressed ? 1f : 0f;
+                _stickRoll -= Gamepad.current.rightShoulder.isPressed ? 1f : 0f;
             }
         }
 
@@ -247,20 +273,41 @@ namespace SpaceShooter.Player
 
         private void ApplyRotation()
         {
-            // Calculate torque from inputs. We no longer need Time.fixedDeltaTime 
-            // since the physics engine handles integration when applying forces.
-            Vector3 torque = new Vector3(
-                _pitch * pitchYawSpeed,
-                _yaw * pitchYawSpeed,
-                _roll * rollSpeed
-            );
+            // Combine continuous stick/key inputs with raw accumulated mouse deltas
+            float rawPitch = _stickPitch + _mousePitchAccumulated;
+            float rawYaw = _stickYaw + _mouseYawAccumulated;
+            float rawRoll = _stickRoll;
 
-            // Add relative torque (local space) to achieve heavy, physics-based drifting
-            _rb.AddRelativeTorque(torque, ForceMode.Acceleration);
+            // Reset mouse accumulators since we're now converting them to rotation this fixed frame
+            _mousePitchAccumulated = 0f;
+            _mouseYawAccumulated = 0f;
+
+            bool hasRotInput = Mathf.Abs(rawPitch) > 0.001f || Mathf.Abs(rawYaw) > 0.001f || Mathf.Abs(rawRoll) > 0.001f;
+
+            if (hasRotInput)
+            {
+                // Target angular velocity in local space (converted to radians for Rigidbody)
+                Vector3 localDesiredAngular = new Vector3(
+                    rawPitch * pitchYawSpeed,
+                    rawYaw * pitchYawSpeed,
+                    rawRoll * rollSpeed
+                ) * Mathf.Deg2Rad;
+
+                // Convert target to world space
+                Vector3 worldDesiredAngular = transform.TransformDirection(localDesiredAngular);
+
+                // Attack: Accelerate current angular velocity towards our target max speed
+                _rb.angularVelocity = Vector3.MoveTowards(
+                    _rb.angularVelocity,
+                    worldDesiredAngular,
+                    rotationAcceleration * Mathf.Deg2Rad * Time.fixedDeltaTime
+                );
+            }
+            // NO ELSE: When there's no input, doing nothing allows _rb.angularDamping (rotationDrag) to naturally sustain/decay the spin!
         }
 
         // ── Public API ────────────────────────────────────────────────────────
-        public Vector2 MoveInput => new Vector2(_yaw, _pitch);
+        public Vector2 MoveInput => new Vector2(_stickYaw, _stickPitch);
         public float ThrustInput => _thrust;
     }
 }
