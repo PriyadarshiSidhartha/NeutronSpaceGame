@@ -69,6 +69,28 @@ namespace SpaceShooter.Player
         [Tooltip("How fast the emission changes")]
         [SerializeField] private float emissionLerpSpeed = 10f;
 
+        [Tooltip("Particle systems on thruster nozzles")]
+        [SerializeField] private ParticleSystem[] thrusterParticles;
+
+        [Header("Particle Lifetime")]
+        [Tooltip("Particle lifetime when idle")]
+        [SerializeField] private float idleParticleLifetime = 0.05f;
+        [Tooltip("Particle lifetime when strafing/rotating/rolling")]
+        [SerializeField] private float moveParticleLifetime = 0.2f;
+        [Tooltip("Particle lifetime when throttling")]
+        [SerializeField] private float thrustParticleLifetime = 0.6f;
+
+        [Header("Particle Alpha")]
+        [Tooltip("Particle material alpha when idle")]
+        [SerializeField] private float idleParticleAlpha = 0.05f;
+        [Tooltip("Particle material alpha when strafing/rotating/rolling")]
+        [SerializeField] private float moveParticleAlpha = 0.4f;
+        [Tooltip("Particle material alpha when throttling")]
+        [SerializeField] private float thrustParticleAlpha = 1f;
+
+        [Tooltip("How fast the particle visuals transition")]
+        [SerializeField] private float particleLerpSpeed = 10f;
+
         // ── Runtime ───────────────────────────────────────────────────────────
         private Rigidbody _rb;
         private Quaternion _initialModelRot;
@@ -76,6 +98,9 @@ namespace SpaceShooter.Player
         private Vector3 _currentAngularInput; // pitch, yaw, roll per frame
         private Material[] _thrusterMaterials;
         private float _currentEmissionIntensity;
+        private float _currentParticleLifetime;
+        private float _currentParticleAlpha;
+        private Material[] _particleMaterials;
 
         // ── Unity lifecycle ───────────────────────────────────────────────────
         private void Awake()
@@ -123,6 +148,26 @@ namespace SpaceShooter.Player
                     }
                 }
             }
+
+            // Cache particle system materials for alpha control
+            if (thrusterParticles != null && thrusterParticles.Length > 0)
+            {
+                _particleMaterials = new Material[thrusterParticles.Length];
+                for (int i = 0; i < thrusterParticles.Length; i++)
+                {
+                    if (thrusterParticles[i] != null)
+                    {
+                        var psRenderer = thrusterParticles[i].GetComponent<ParticleSystemRenderer>();
+                        if (psRenderer != null)
+                            _particleMaterials[i] = psRenderer.material;
+                    }
+                }
+            }
+
+            // Start at idle values so there's no ramp-from-zero on the first frame
+            _currentEmissionIntensity = idleEmissionMultiplier;
+            _currentParticleLifetime = idleParticleLifetime;
+            _currentParticleAlpha = idleParticleAlpha;
         }
 
         private void Update()
@@ -152,12 +197,52 @@ namespace SpaceShooter.Player
 
         private void UpdateThrusterVisuals()
         {
-            if (_thrusterMaterials == null || _thrusterMaterials.Length == 0) return;
-
             bool isThrusting = _thrust > 0.01f;
             bool isMovingWithoutThrust = Mathf.Abs(_strafe) > 0.01f || Mathf.Abs(_vertical) > 0.01f ||
                                          Mathf.Abs(_stickPitch) > 0.01f || Mathf.Abs(_stickYaw) > 0.01f || Mathf.Abs(_stickRoll) > 0.01f ||
                                          Mathf.Abs(_mousePitchAccumulated) > 0.01f || Mathf.Abs(_mouseYawAccumulated) > 0.01f;
+
+            // ── Thruster particles (lifetime + alpha) ──────────────────────
+            if (thrusterParticles != null && thrusterParticles.Length > 0)
+            {
+                // Pick target based on 3 states
+                float targetLifetime = idleParticleLifetime;
+                float targetAlpha = idleParticleAlpha;
+                if (isThrusting)
+                {
+                    targetLifetime = thrustParticleLifetime;
+                    targetAlpha = thrustParticleAlpha;
+                }
+                else if (isMovingWithoutThrust)
+                {
+                    targetLifetime = moveParticleLifetime;
+                    targetAlpha = moveParticleAlpha;
+                }
+
+                _currentParticleLifetime = Mathf.Lerp(_currentParticleLifetime, targetLifetime, Time.deltaTime * particleLerpSpeed);
+                _currentParticleAlpha = Mathf.Lerp(_currentParticleAlpha, targetAlpha, Time.deltaTime * particleLerpSpeed);
+
+                foreach (var ps in thrusterParticles)
+                {
+                    if (ps == null) continue;
+                    var main = ps.main;
+                    main.startLifetime = _currentParticleLifetime;
+                }
+
+                if (_particleMaterials != null)
+                {
+                    foreach (var mat in _particleMaterials)
+                    {
+                        if (mat == null) continue;
+                        Color c = mat.color;
+                        c.a = _currentParticleAlpha;
+                        mat.color = c;
+                    }
+                }
+            }
+
+            // ── Emission color ───────────────────────────────────────────────
+            if (_thrusterMaterials == null || _thrusterMaterials.Length == 0) return;
 
             float targetEmission = idleEmissionMultiplier;
             if (isThrusting) targetEmission = thrustEmissionMultiplier;
@@ -165,7 +250,6 @@ namespace SpaceShooter.Player
 
             _currentEmissionIntensity = Mathf.Lerp(_currentEmissionIntensity, targetEmission, Time.deltaTime * emissionLerpSpeed);
 
-            // Apply to the material's emission color property
             foreach (var mat in _thrusterMaterials)
             {
                 if (mat != null)
@@ -290,7 +374,7 @@ namespace SpaceShooter.Player
             {
                 // Current angular velocity in local space
                 Vector3 localAngularVel = transform.InverseTransformDirection(_rb.angularVelocity);
-                
+
                 float radPitchSpeed = pitchYawSpeed * Mathf.Deg2Rad;
                 float radRollSpeed = rollSpeed * Mathf.Deg2Rad;
                 float accel = rotationAcceleration * Mathf.Deg2Rad * Time.fixedDeltaTime;
@@ -300,10 +384,10 @@ namespace SpaceShooter.Player
                 // allowing Rigidbody angularDamping to naturally decay that specific axis.
                 if (hasPitch)
                     localAngularVel.x = Mathf.MoveTowards(localAngularVel.x, rawPitch * radPitchSpeed, accel);
-                
+
                 if (hasYaw)
                     localAngularVel.y = Mathf.MoveTowards(localAngularVel.y, rawYaw * radPitchSpeed, accel);
-                
+
                 if (hasRoll)
                     localAngularVel.z = Mathf.MoveTowards(localAngularVel.z, rawRoll * radRollSpeed, accel);
 
