@@ -247,6 +247,17 @@ namespace SpaceShooter.Player
             );
         }
 
+        // ── Public API ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Adds a sudden impulse of shake (e.g. for firing weapons or taking damage)
+        /// that naturally decays over time using the camera's pulseDecayRate.
+        /// </summary>
+        public void AddShake(float intensity, float maxIntensity = 1f)
+        {
+            _currentPulse = Mathf.Min(_currentPulse + intensity, maxIntensity);
+        }
+
         // ── Utilities ─────────────────────────────────────────────────────────
 
         /// <summary>

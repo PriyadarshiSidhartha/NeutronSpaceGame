@@ -152,7 +152,7 @@ namespace SpaceShooter.Player
                         Material[] mats = thrusterRenderers[i].materials;
                         if (mats.Length > 1)
                         {
-                            _thrusterMaterials[i] = mats[1];
+                            _thrusterMaterials[i] = mats[0];
                             _thrusterMaterials[i].EnableKeyword("_EMISSION");
                         }
                     }
@@ -209,8 +209,8 @@ namespace SpaceShooter.Player
 
             // Combine all axes, clamped to prevent extreme flipping
             float totalTargetPitch = Mathf.Clamp(verticalPitch + pitchTurnSway, -45f, 45f);
-            float totalTargetYaw   = Mathf.Clamp(yawSway, -30f, 30f);
-            float totalTargetRoll  = Mathf.Clamp(strafeBank + turnBank, -70f, 70f);
+            float totalTargetYaw = Mathf.Clamp(yawSway, -30f, 30f);
+            float totalTargetRoll = Mathf.Clamp(strafeBank + turnBank, -70f, 70f);
 
             Quaternion targetRotation = _initialModelRot * Quaternion.Euler(totalTargetPitch, totalTargetYaw, totalTargetRoll);
             shipModel.localRotation = Quaternion.Slerp(shipModel.localRotation, targetRotation, Time.deltaTime * swaySpeed);
