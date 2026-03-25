@@ -30,8 +30,10 @@ namespace SpaceShooter.Player
         [Header("Smoothing")]
         [Tooltip("Position follow speed — higher = tighter follow")]
         [SerializeField] private float positionDamping  = 6f;
-        [Tooltip("Rotation follow speed — higher = snappier rotation")]
-        [SerializeField] private float rotationDamping  = 5f;
+        [Tooltip("Pitch & yaw follow speed — higher = snappier aiming")]
+        [SerializeField] private float pitchYawDamping  = 5f;
+        [Tooltip("Roll follow speed — lower = more cinematic, floaty roll")]
+        [SerializeField] private float rollDamping      = 3f;
 
         [Header("Look-ahead")]
         [Tooltip("How far ahead of the ship the camera looks (depth)")]
@@ -66,6 +68,8 @@ namespace SpaceShooter.Player
         private Camera _cam;
         private Vector3 _smoothedPosition;
         private Quaternion _smoothedRotation;
+        private Vector3 _smoothedForward;
+        private Vector3 _smoothedUp;
         private float _currentPulse;
         private bool _wasThrusting;
         private bool _initialized;
@@ -126,10 +130,9 @@ namespace SpaceShooter.Player
                                     + target.up * heightOffset;
 
                 Vector3 lookTarget = target.position + target.forward * lookAheadDistance;
-                _smoothedRotation = Quaternion.LookRotation(
-                    lookTarget - _smoothedPosition,
-                    target.up
-                );
+                _smoothedForward = (lookTarget - _smoothedPosition).normalized;
+                _smoothedUp = target.up;
+                _smoothedRotation = Quaternion.LookRotation(_smoothedForward, _smoothedUp);
 
                 _initialized = true;
             }
@@ -164,15 +167,22 @@ namespace SpaceShooter.Player
 
         private void UpdateRotation()
         {
+            // Desired aim direction and up vector
             Vector3 lookTarget = target.position + target.forward * lookAheadDistance;
-            Quaternion desiredRotation = Quaternion.LookRotation(
-                lookTarget - _smoothedPosition,
-                target.up
-            );
+            Vector3 desiredForward = (lookTarget - _smoothedPosition).normalized;
+            Vector3 desiredUp = target.up;
 
-            // Frame-rate independent exponential decay smoothing
-            float t = SmoothFactor(rotationDamping, Time.deltaTime);
-            _smoothedRotation = Quaternion.Slerp(_smoothedRotation, desiredRotation, t);
+            // Smooth forward (pitch + yaw) and up (roll) independently
+            float aimT  = SmoothFactor(pitchYawDamping, Time.deltaTime);
+            float rollT = SmoothFactor(rollDamping, Time.deltaTime);
+
+            _smoothedForward = Vector3.Slerp(_smoothedForward, desiredForward, aimT).normalized;
+            _smoothedUp      = Vector3.Slerp(_smoothedUp, desiredUp, rollT).normalized;
+
+            // Re-orthogonalise up against forward to prevent drift
+            _smoothedUp = (Quaternion.LookRotation(_smoothedForward, _smoothedUp) * Vector3.up).normalized;
+
+            _smoothedRotation = Quaternion.LookRotation(_smoothedForward, _smoothedUp);
         }
 
         private void ApplyShake()

@@ -170,7 +170,8 @@ MonoBehaviour:
   followDistance: 15
   heightOffset: 7
   positionDamping: 40
-  rotationDamping: 40
+  pitchYawDamping: 45
+  rollDamping: 5
   lookAheadDistance: 70
   thrustShakeIntensity: 0.007
   thrustShakeSpeed: 20
