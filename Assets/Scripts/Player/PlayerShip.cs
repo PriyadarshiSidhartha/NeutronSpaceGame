@@ -24,6 +24,8 @@ namespace SpaceShooter.Player
         [SerializeField] private float thrustSpeed = 25f;
         [Tooltip("Lateral (strafe) speed")]
         [SerializeField] private float strafeSpeed = 12f;
+        [Tooltip("Vertical (up/down) speed")]
+        [SerializeField] private float verticalSpeed = 12f;
         [Tooltip("How quickly the ship accelerates toward input velocity")]
         [SerializeField] private float acceleration = 6f;
         [Tooltip("How quickly the ship slows down over time (drag)")]
@@ -50,6 +52,8 @@ namespace SpaceShooter.Player
         [SerializeField] private Transform shipModel;
         [Tooltip("Amount of visual tilt when strafing horizontally")]
         [SerializeField] private float swayAmount = 15f;
+        [Tooltip("Amount of visual pitch tilt when moving vertically")]
+        [SerializeField] private float verticalSwayAmount = 10f;
         [Tooltip("Amount of visual bank when turning left/right (yaw bank)")]
         [SerializeField] private float turnSwayMultiplier = 10f;
         [Tooltip("How fast the sway interpolates")]
@@ -188,10 +192,14 @@ namespace SpaceShooter.Player
             float localYawVelocity = transform.InverseTransformDirection(_rb.angularVelocity).y;
             float turnBank = -localYawVelocity * turnSwayMultiplier;
 
+            // 3. Vertical movement -> pitch tilt (up = nose down, down = nose up)
+            float verticalPitch = -_vertical * verticalSwayAmount;
+
             // Combine the two banks seamlessly, clamped to prevent extreme flipping if they max out both!
             float totalTargetRoll = Mathf.Clamp(strafeBank + turnBank, -70f, 70f);
+            float totalTargetPitch = Mathf.Clamp(verticalPitch, -45f, 45f);
 
-            Quaternion targetRotation = _initialModelRot * Quaternion.Euler(0f, 0f, totalTargetRoll);
+            Quaternion targetRotation = _initialModelRot * Quaternion.Euler(totalTargetPitch, 0f, totalTargetRoll);
             shipModel.localRotation = Quaternion.Slerp(shipModel.localRotation, targetRotation, Time.deltaTime * swaySpeed);
         }
 
@@ -334,7 +342,7 @@ namespace SpaceShooter.Player
                 // Desired velocity in LOCAL space based on current input
                 Vector3 localDesired = new Vector3(
                     _strafe * strafeSpeed,
-                    _vertical * strafeSpeed,
+                    _vertical * verticalSpeed,
                     _thrust * thrustSpeed
                 );
 

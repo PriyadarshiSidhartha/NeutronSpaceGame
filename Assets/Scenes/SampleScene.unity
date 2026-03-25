@@ -26,7 +26,7 @@ RenderSettings:
   m_AmbientIntensity: 1
   m_AmbientMode: 0
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
-  m_SkyboxMaterial: {fileID: 2100000, guid: f7cb8487b367540e0aec11286f104253, type: 2}
+  m_SkyboxMaterial: {fileID: 2100000, guid: b0d4c5f7ede78453e842747e9f42c28e, type: 2}
   m_HaloStrength: 0.5
   m_FlareStrength: 1
   m_FlareFadeSpeed: 3
@@ -37,7 +37,7 @@ RenderSettings:
   m_ReflectionBounces: 1
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
-  m_Sun: {fileID: 0}
+  m_Sun: {fileID: 410087040}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -167,15 +167,20 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SpaceShooter.Player.SpaceCameraFollow
   target: {fileID: 807016518}
-  followDistance: 12
-  heightOffset: 5
+  followDistance: 15
+  heightOffset: 7
   positionDamping: 40
   rotationDamping: 40
   lookAheadDistance: 70
-  thrustShakeIntensity: 0.01
-  thrustShakeSpeed: 25
+  thrustShakeIntensity: 0.007
+  thrustShakeSpeed: 20
   initialPulseIntensity: 0.07
-  pulseDecayRate: 0.25
+  pulseDecayRate: 0.15
+  baseFOV: 60
+  thrustFOVBoost: 10
+  fovLerpSpeed: 5
+  thrustChromaticAberration: 0.2
+  chromaticLerpSpeed: 5
 --- !u!114 &48458217
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -261,7 +266,7 @@ Camera:
     height: 1
   near clip plane: 0.01
   far clip plane: 10000
-  field of view: 70
+  field of view: 60
   orthographic: 0
   orthographic size: 5
   m_Depth: 0
@@ -1298,6 +1303,26 @@ PrefabInstance:
       value: -1
       objectReference: {fileID: 0}
     - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: rollSpeed
+      value: 75
+      objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: swayAmount
+      value: 7
+      objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: rotationDrag
+      value: 0.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: pitchYawSpeed
+      value: 70
+      objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: verticalSpeed
+      value: 60
+      objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
       propertyPath: emissionLerpSpeed
       value: 25
       objectReference: {fileID: 0}
@@ -1314,6 +1339,14 @@ PrefabInstance:
       value: 15
       objectReference: {fileID: 0}
     - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: turnSwayMultiplier
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: verticalSwayAmount
+      value: 12
+      objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
       propertyPath: idleParticleLifetime
       value: 0
       objectReference: {fileID: 0}
@@ -1326,8 +1359,16 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: moveEmissionMultiplier
+      value: 50
+      objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
       propertyPath: thrustParticleLifetime
       value: 0.7
+      objectReference: {fileID: 0}
+    - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
+      propertyPath: thrustEmissionMultiplier
+      value: 200
       objectReference: {fileID: 0}
     - target: {fileID: 5326958608565334347, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
       propertyPath: particleLifetimeLerpSpeed
@@ -1427,7 +1468,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8968434550229065760, guid: 87fc91d0c1d2e49e5885cd044f11d18b, type: 3}
       propertyPath: spreadAngle
-      value: 0.5
+      value: 0.25
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects:

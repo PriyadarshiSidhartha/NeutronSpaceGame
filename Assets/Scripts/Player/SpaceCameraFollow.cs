@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace SpaceShooter.Player
 {
@@ -26,9 +28,9 @@ namespace SpaceShooter.Player
         [SerializeField] private float heightOffset   = 3f;
 
         [Header("Smoothing")]
-        [Tooltip("Position follow speed — lower = more floaty lag")]
+        [Tooltip("Position follow speed — higher = tighter follow")]
         [SerializeField] private float positionDamping  = 6f;
-        [Tooltip("Rotation follow speed — lower = more cinematic roll")]
+        [Tooltip("Rotation follow speed — higher = snappier rotation")]
         [SerializeField] private float rotationDamping  = 5f;
 
         [Header("Look-ahead")]
@@ -45,12 +47,34 @@ namespace SpaceShooter.Player
         [Tooltip("How fast the initial pulse fades out")]
         [SerializeField] private float pulseDecayRate = 5f;
 
+        [Header("FOV Shift")]
+        [Tooltip("Base field of view when not throttling")]
+        [SerializeField] private float baseFOV = 60f;
+        [Tooltip("Extra FOV added at full throttle")]
+        [SerializeField] private float thrustFOVBoost = 10f;
+        [Tooltip("How fast the FOV transitions")]
+        [SerializeField] private float fovLerpSpeed = 5f;
+
+        [Header("Chromatic Aberration")]
+        [Tooltip("Max chromatic aberration intensity at full throttle (0-1)")]
+        [SerializeField] private float thrustChromaticAberration = 0.35f;
+        [Tooltip("How fast the aberration transitions")]
+        [SerializeField] private float chromaticLerpSpeed = 5f;
+
         // ── Runtime ───────────────────────────────────────────────────────────
         private PlayerShip _playerShip;
+        private Camera _cam;
         private Vector3 _smoothedPosition;
         private Quaternion _smoothedRotation;
         private float _currentPulse;
         private bool _wasThrusting;
+        private bool _initialized;
+        private ChromaticAberration _chromaticAberration;
+
+        // Fixed Perlin noise seed offsets — avoids axis correlation
+        private float _noiseSeedX;
+        private float _noiseSeedY;
+        private float _noiseSeedZ;
 
         // ── Unity lifecycle ───────────────────────────────────────────────────
         private void Awake()
@@ -64,17 +88,50 @@ namespace SpaceShooter.Player
 
             if (target != null)
                 _playerShip = target.GetComponent<PlayerShip>();
+
+            _cam = GetComponent<Camera>();
+            if (_cam != null)
+                baseFOV = _cam.fieldOfView;
+
+            // Try to find a Volume on this camera or in the scene
+            var volume = GetComponent<Volume>();
+            if (volume == null)
+                volume = FindFirstObjectByType<Volume>();
+
+            if (volume != null && volume.profile != null)
+            {
+                if (!volume.profile.TryGet(out _chromaticAberration))
+                {
+                    _chromaticAberration = volume.profile.Add<ChromaticAberration>();
+                }
+                _chromaticAberration.active = true;
+                _chromaticAberration.intensity.overrideState = true;
+            }
+
+            // Generate unique random seeds so each noise axis is uncorrelated
+            _noiseSeedX = Random.Range(0f, 1000f);
+            _noiseSeedY = Random.Range(0f, 1000f);
+            _noiseSeedZ = Random.Range(0f, 1000f);
         }
 
         private void LateUpdate()
         {
             if (target == null) return;
 
-            // Initialize smoothed vectors if this is the first frame
-            if (_smoothedPosition == Vector3.zero)
+            // Snap to target on the very first frame — no lerp-from-origin pop
+            if (!_initialized)
             {
-                _smoothedPosition = transform.position;
-                _smoothedRotation = transform.rotation;
+                _smoothedPosition = target.position
+                                    - target.forward * followDistance
+                                    + target.up * heightOffset;
+
+                Vector3 lookTarget = target.position + target.forward * lookAheadDistance;
+                _smoothedRotation = Quaternion.LookRotation(
+                    lookTarget - _smoothedPosition,
+                    target.up
+                );
+
+                _initialized = true;
             }
 
             UpdatePosition();
@@ -85,7 +142,11 @@ namespace SpaceShooter.Player
             transform.rotation = _smoothedRotation;
 
             if (_playerShip != null)
+            {
                 ApplyShake();
+                ApplyFOVShift();
+                ApplyChromaticAberration();
+            }
         }
 
         // ── Camera logic ──────────────────────────────────────────────────────
@@ -96,11 +157,9 @@ namespace SpaceShooter.Player
                 - target.forward * followDistance
                 + target.up      * heightOffset;
 
-            _smoothedPosition = Vector3.Lerp(
-                _smoothedPosition,
-                desiredPosition,
-                positionDamping * Time.deltaTime
-            );
+            // Frame-rate independent exponential decay smoothing
+            float t = SmoothFactor(positionDamping, Time.deltaTime);
+            _smoothedPosition = Vector3.Lerp(_smoothedPosition, desiredPosition, t);
         }
 
         private void UpdateRotation()
@@ -111,11 +170,9 @@ namespace SpaceShooter.Player
                 target.up
             );
 
-            _smoothedRotation = Quaternion.Slerp(
-                _smoothedRotation,
-                desiredRotation,
-                rotationDamping * Time.deltaTime
-            );
+            // Frame-rate independent exponential decay smoothing
+            float t = SmoothFactor(rotationDamping, Time.deltaTime);
+            _smoothedRotation = Quaternion.Slerp(_smoothedRotation, desiredRotation, t);
         }
 
         private void ApplyShake()
@@ -138,11 +195,13 @@ namespace SpaceShooter.Player
 
             if (totalShake > 0.001f)
             {
-                // Generate layered Perlin noise mapped from 0..1 to -1..1
+                // Generate layered Perlin noise with unique seeds per axis
+                // to avoid correlated movement patterns
+                float time = Time.time * thrustShakeSpeed;
                 Vector3 noise = new Vector3(
-                    Mathf.PerlinNoise(Time.time * thrustShakeSpeed, 0f) - 0.5f,
-                    Mathf.PerlinNoise(0f, Time.time * thrustShakeSpeed) - 0.5f,
-                    Mathf.PerlinNoise(Time.time * thrustShakeSpeed, Time.time * thrustShakeSpeed) - 0.5f
+                    Mathf.PerlinNoise(time + _noiseSeedX, _noiseSeedY) - 0.5f,
+                    Mathf.PerlinNoise(_noiseSeedZ, time + _noiseSeedX) - 0.5f,
+                    Mathf.PerlinNoise(time + _noiseSeedY, time + _noiseSeedZ) - 0.5f
                 ) * 2f;
 
                 transform.position += noise * totalShake;
@@ -154,6 +213,49 @@ namespace SpaceShooter.Player
                     noise.z * totalShake * 10f
                 );
             }
+        }
+
+        private void ApplyFOVShift()
+        {
+            if (_cam == null) return;
+
+            float targetFOV = baseFOV + thrustFOVBoost * _playerShip.ThrustInput;
+            float t = SmoothFactor(fovLerpSpeed, Time.deltaTime);
+            _cam.fieldOfView = Mathf.Lerp(_cam.fieldOfView, targetFOV, t);
+        }
+
+        private void ApplyChromaticAberration()
+        {
+            if (_chromaticAberration == null) return;
+
+            float targetIntensity = thrustChromaticAberration * _playerShip.ThrustInput;
+            float t = SmoothFactor(chromaticLerpSpeed, Time.deltaTime);
+            _chromaticAberration.intensity.value = Mathf.Lerp(
+                _chromaticAberration.intensity.value,
+                targetIntensity,
+                t
+            );
+        }
+
+        // ── Utilities ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns a frame-rate independent blend factor for use with Lerp/Slerp.
+        ///
+        /// The naive approach <c>Lerp(a, b, speed * deltaTime)</c> is NOT frame-rate
+        /// independent — it converges faster at higher frame rates.
+        ///
+        /// The correct model is exponential decay: each frame, the remaining gap
+        /// shrinks by a fixed *ratio* rather than a fixed *amount*.
+        ///
+        ///   blendFactor = 1 − e^(−speed × Δt)
+        ///
+        /// This gives identical visual results at 30 fps, 60 fps, 144 fps, or any
+        /// variable rate — eliminating a major source of camera jitter.
+        /// </summary>
+        private static float SmoothFactor(float speed, float deltaTime)
+        {
+            return 1f - Mathf.Exp(-speed * deltaTime);
         }
 
         // ── Editor helper — draw the follow gizmo ─────────────────────────────
