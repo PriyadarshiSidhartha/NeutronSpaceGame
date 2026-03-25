@@ -38,6 +38,8 @@ namespace SpaceShooter.Player
         [SerializeField] private float pitchYawSpeed = 90f;
         [Tooltip("Max roll speed (degrees/sec)")]
         [SerializeField] private float rollSpeed = 75f;
+        [Tooltip("Roll speed multiplier when the counter shoulder button is also held (0-1)")]
+        [SerializeField][Range(0f, 1f)] private float counterRollMultiplier = 0.3f;
         [Tooltip("Mouse sensitivity multiplier")]
         [SerializeField] private float mouseSensitivity = 0.5f;
 
@@ -56,6 +58,10 @@ namespace SpaceShooter.Player
         [SerializeField] private float verticalSwayAmount = 10f;
         [Tooltip("Amount of visual bank when turning left/right (yaw bank)")]
         [SerializeField] private float turnSwayMultiplier = 10f;
+        [Tooltip("Amount of visual yaw turn when rotating horizontally")]
+        [SerializeField] private float yawSwayMultiplier = 5f;
+        [Tooltip("Amount of visual pitch tilt when pitching up/down (pitch sway)")]
+        [SerializeField] private float pitchSwayMultiplier = 8f;
         [Tooltip("How fast the sway interpolates")]
         [SerializeField] private float swaySpeed = 5f;
 
@@ -189,17 +195,24 @@ namespace SpaceShooter.Player
             float strafeBank = -_strafe * swayAmount;
 
             // 2. Yaw right (local angular velocity Y > 0) -> bank right (negative Z)
-            float localYawVelocity = transform.InverseTransformDirection(_rb.angularVelocity).y;
-            float turnBank = -localYawVelocity * turnSwayMultiplier;
+            Vector3 localAngularVel = transform.InverseTransformDirection(_rb.angularVelocity);
+            float turnBank = -localAngularVel.y * turnSwayMultiplier;
 
             // 3. Vertical movement -> pitch tilt (up = nose down, down = nose up)
             float verticalPitch = -_vertical * verticalSwayAmount;
 
-            // Combine the two banks seamlessly, clamped to prevent extreme flipping if they max out both!
-            float totalTargetRoll = Mathf.Clamp(strafeBank + turnBank, -70f, 70f);
-            float totalTargetPitch = Mathf.Clamp(verticalPitch, -45f, 45f);
+            // 4. Pitch rotation -> pitch tilt (pitching down = nose dips forward, pitching up = nose tilts back)
+            float pitchTurnSway = localAngularVel.x * pitchSwayMultiplier;
 
-            Quaternion targetRotation = _initialModelRot * Quaternion.Euler(totalTargetPitch, 0f, totalTargetRoll);
+            // 5. Yaw rotation -> yaw sway (turning right = model turns slightly right)
+            float yawSway = localAngularVel.y * yawSwayMultiplier;
+
+            // Combine all axes, clamped to prevent extreme flipping
+            float totalTargetPitch = Mathf.Clamp(verticalPitch + pitchTurnSway, -45f, 45f);
+            float totalTargetYaw   = Mathf.Clamp(yawSway, -30f, 30f);
+            float totalTargetRoll  = Mathf.Clamp(strafeBank + turnBank, -70f, 70f);
+
+            Quaternion targetRotation = _initialModelRot * Quaternion.Euler(totalTargetPitch, totalTargetYaw, totalTargetRoll);
             shipModel.localRotation = Quaternion.Slerp(shipModel.localRotation, targetRotation, Time.deltaTime * swaySpeed);
         }
 
@@ -282,6 +295,9 @@ namespace SpaceShooter.Player
         // Accumulated mouse deltas (to sync Update with FixedUpdate without jitter)
         private float _mousePitchAccumulated, _mouseYawAccumulated;
 
+        // Tracks which shoulder initiated the roll: +1 = L1 first, -1 = R1 first, 0 = none
+        private float _primaryRollDirection;
+
         private void ReadInput()
         {
             _thrust = 0f;
@@ -327,8 +343,32 @@ namespace SpaceShooter.Player
                 _strafe += leftStick.x;
                 _vertical += leftStick.y;
                 _thrust += Gamepad.current.rightTrigger.ReadValue(); // forward only
-                _stickRoll += Gamepad.current.leftShoulder.isPressed ? 1f : 0f;
-                _stickRoll -= Gamepad.current.rightShoulder.isPressed ? 1f : 0f;
+
+                // Counter-roll mechanic: pressing the opposite shoulder while rolling
+                // slows the roll instead of reversing it
+                bool l1 = Gamepad.current.leftShoulder.isPressed;
+                bool r1 = Gamepad.current.rightShoulder.isPressed;
+
+                if (l1 && r1)
+                {
+                    // Both held — roll in the primary direction at reduced speed
+                    _stickRoll += _primaryRollDirection * counterRollMultiplier;
+                }
+                else if (l1)
+                {
+                    _primaryRollDirection = 1f;
+                    _stickRoll += 1f;
+                }
+                else if (r1)
+                {
+                    _primaryRollDirection = -1f;
+                    _stickRoll -= 1f;
+                }
+                else
+                {
+                    // Neither held — reset primary direction
+                    _primaryRollDirection = 0f;
+                }
             }
         }
 
