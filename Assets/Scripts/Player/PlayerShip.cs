@@ -59,7 +59,7 @@ namespace SpaceShooter.Player
         [Tooltip("Renderers for the thruster flames")]
         [SerializeField] private Renderer[] thrusterRenderers;
         [Tooltip("The base emission color of the thruster")]
-        [ColorUsage(false, true)] [SerializeField] private Color thrusterBaseColor = Color.cyan;
+        [ColorUsage(false, true)][SerializeField] private Color thrusterBaseColor = Color.cyan;
         [Tooltip("Emission intensity when idle")]
         [SerializeField] private float idleEmissionMultiplier = 0.5f;
         [Tooltip("Emission intensity when strafing/rotating/rolling")]
@@ -155,7 +155,7 @@ namespace SpaceShooter.Player
             if (_thrusterMaterials == null || _thrusterMaterials.Length == 0) return;
 
             bool isThrusting = _thrust > 0.01f;
-            bool isMovingWithoutThrust = Mathf.Abs(_strafe) > 0.01f || Mathf.Abs(_vertical) > 0.01f || 
+            bool isMovingWithoutThrust = Mathf.Abs(_strafe) > 0.01f || Mathf.Abs(_vertical) > 0.01f ||
                                          Mathf.Abs(_stickPitch) > 0.01f || Mathf.Abs(_stickYaw) > 0.01f || Mathf.Abs(_stickRoll) > 0.01f ||
                                          Mathf.Abs(_mousePitchAccumulated) > 0.01f || Mathf.Abs(_mouseYawAccumulated) > 0.01f;
 
@@ -183,10 +183,10 @@ namespace SpaceShooter.Player
 
         // ── Input ─────────────────────────────────────────────────────────────
         private float _thrust, _strafe, _vertical;
-        
+
         // Continuous input axes (Keyboard, Gamepad stick)
         private float _stickPitch, _stickYaw, _stickRoll;
-        
+
         // Accumulated mouse deltas (to sync Update with FixedUpdate without jitter)
         private float _mousePitchAccumulated, _mouseYawAccumulated;
 
@@ -205,13 +205,13 @@ namespace SpaceShooter.Player
                 // Forward thrust — Space only, no backward
                 if (Keyboard.current.spaceKey.isPressed) _thrust += 1f;
 
-                // Pitch — W/S (Inverted)
-                if (Keyboard.current.wKey.isPressed) _stickPitch -= 1f;  // W = pitch up
-                if (Keyboard.current.sKey.isPressed) _stickPitch += 1f;  // S = pitch down
+                // Pitch — W/S
+                if (Keyboard.current.wKey.isPressed) _stickPitch += 1f;  // W = pitch down
+                if (Keyboard.current.sKey.isPressed) _stickPitch -= 1f;  // S = pitch up
 
-                // Roll — A/D tilt left/right (Inverted)
-                if (Keyboard.current.aKey.isPressed) _stickRoll -= 1f;  // A = tilt left
-                if (Keyboard.current.dKey.isPressed) _stickRoll += 1f;  // D = tilt right
+                // Roll — A/D tilt left/right
+                if (Keyboard.current.aKey.isPressed) _stickRoll += 1f;  // A = tilt right
+                if (Keyboard.current.dKey.isPressed) _stickRoll -= 1f;  // D = tilt left
             }
 
             // ── Mouse ─────────────────────────────────────────────────────────
@@ -220,7 +220,7 @@ namespace SpaceShooter.Player
                 Vector2 mouseDelta = Mouse.current.delta.ReadValue();
                 // Accumulate mouse deltas to apply them perfectly in fixed intervals without losing input.
                 // Scaled slightly so standard sensitivity feels reasonable against stick input.
-                _mousePitchAccumulated += mouseDelta.y * mouseSensitivity * 0.1f;
+                _mousePitchAccumulated -= mouseDelta.y * mouseSensitivity * 0.1f;
                 _mouseYawAccumulated += mouseDelta.x * mouseSensitivity * 0.1f;
             }
 
@@ -282,28 +282,35 @@ namespace SpaceShooter.Player
             _mousePitchAccumulated = 0f;
             _mouseYawAccumulated = 0f;
 
-            bool hasRotInput = Mathf.Abs(rawPitch) > 0.001f || Mathf.Abs(rawYaw) > 0.001f || Mathf.Abs(rawRoll) > 0.001f;
+            bool hasPitch = Mathf.Abs(rawPitch) > 0.001f;
+            bool hasYaw = Mathf.Abs(rawYaw) > 0.001f;
+            bool hasRoll = Mathf.Abs(rawRoll) > 0.001f;
 
-            if (hasRotInput)
+            if (hasPitch || hasYaw || hasRoll)
             {
-                // Target angular velocity in local space (converted to radians for Rigidbody)
-                Vector3 localDesiredAngular = new Vector3(
-                    rawPitch * pitchYawSpeed,
-                    rawYaw * pitchYawSpeed,
-                    rawRoll * rollSpeed
-                ) * Mathf.Deg2Rad;
+                // Current angular velocity in local space
+                Vector3 localAngularVel = transform.InverseTransformDirection(_rb.angularVelocity);
+                
+                float radPitchSpeed = pitchYawSpeed * Mathf.Deg2Rad;
+                float radRollSpeed = rollSpeed * Mathf.Deg2Rad;
+                float accel = rotationAcceleration * Mathf.Deg2Rad * Time.fixedDeltaTime;
 
-                // Convert target to world space
-                Vector3 worldDesiredAngular = transform.TransformDirection(localDesiredAngular);
+                // Apply input acceleration per-axis.
+                // If an axis has no input, we don't overwrite its velocity, 
+                // allowing Rigidbody angularDamping to naturally decay that specific axis.
+                if (hasPitch)
+                    localAngularVel.x = Mathf.MoveTowards(localAngularVel.x, rawPitch * radPitchSpeed, accel);
+                
+                if (hasYaw)
+                    localAngularVel.y = Mathf.MoveTowards(localAngularVel.y, rawYaw * radPitchSpeed, accel);
+                
+                if (hasRoll)
+                    localAngularVel.z = Mathf.MoveTowards(localAngularVel.z, rawRoll * radRollSpeed, accel);
 
-                // Attack: Accelerate current angular velocity towards our target max speed
-                _rb.angularVelocity = Vector3.MoveTowards(
-                    _rb.angularVelocity,
-                    worldDesiredAngular,
-                    rotationAcceleration * Mathf.Deg2Rad * Time.fixedDeltaTime
-                );
+                // Convert back to world space
+                _rb.angularVelocity = transform.TransformDirection(localAngularVel);
             }
-            // NO ELSE: When there's no input, doing nothing allows _rb.angularDamping (rotationDrag) to naturally sustain/decay the spin!
+            // NO ELSE: When there's no input on ALL axes, doing nothing allows _rb.angularDamping (rotationDrag) to naturally sustain/decay the whole spin!
         }
 
         // ── Public API ────────────────────────────────────────────────────────
