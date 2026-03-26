@@ -14,6 +14,9 @@ namespace SpaceShooter.Weapons
         [SerializeField] private float speed  = 60f;
         [SerializeField] private float lifetime = 4f;
 
+        /// <summary>The bullet's travel speed. Used by aim prediction to estimate travel time.</summary>
+        public float Speed => speed;
+
         // ── Runtime ───────────────────────────────────────────────────────────
         private int       _damage;
         private Vector3   _inheritedVelocity;   // ship velocity baked in at spawn

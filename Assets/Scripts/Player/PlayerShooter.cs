@@ -5,7 +5,7 @@ namespace SpaceShooter.Player
 {
     /// <summary>
     /// Handles player firing — spawns bullets from one or more muzzle points.
-    /// Hold the fire button (LMB / South gamepad button) for continuous fire.
+    /// Hold the fire button (LMB / Left Trigger) for continuous fire.
     /// Bullet lifetime and pooling are managed entirely by Bullet.cs + BulletPool.cs.
     /// </summary>
     public class PlayerShooter : MonoBehaviour
@@ -39,6 +39,14 @@ namespace SpaceShooter.Player
         [Tooltip("Layer mask for obstacles blocking line of sight to the target")]
         [SerializeField] private LayerMask obstacleMask;
 
+        [Header("Predictive Lead")]
+        [Tooltip("How much of the predicted offset is applied (0 = no lead, 1 = full lead)")]
+        [SerializeField][Range(0f, 1f)] private float predictionStrength = 0.85f;
+        [Tooltip("Maximum lead distance to prevent wild overshoots on very fast targets")]
+        [SerializeField] private float maxLeadDistance = 50f;
+        [Tooltip("Beyond this distance, full prediction is applied. Closer targets get less prediction.")]
+        [SerializeField] private float fullPredictionDistance = 150f;
+
         [Header("Bullet Spread (optional)")]
         [Range(0f, 5f)]
         [SerializeField] private float spreadAngle = 0f;        // 0 = laser-straight
@@ -63,6 +71,8 @@ namespace SpaceShooter.Player
         private Vector3   _currentAimPoint;
         private bool      _isTooClose;
         private int       _currentMuzzleIndex;
+        private float     _bulletSpeed;       // auto-detected from BulletPool prefab
+        private bool      _aimAssistEnabled = true;
 
         // ── Unity lifecycle ───────────────────────────────────────────────────
         private void Awake()
@@ -79,17 +89,58 @@ namespace SpaceShooter.Player
             _fireTimer = 0f;
         }
 
+        private void Start()
+        {
+            // Auto-detect bullet speed from the BulletPool prefab — no need to duplicate the value manually
+            if (Weapons.BulletPool.Instance != null)
+                _bulletSpeed = Weapons.BulletPool.Instance.PlayerBulletSpeed;
+            else
+                _bulletSpeed = 60f; // safe fallback
+        }
+
         private void Update()
         {
             ReadFireInput();
+            ReadToggleInput();
             UpdateAim();
             HandleFiring();
         }
 
+        // ── Input ─────────────────────────────────────────────────────────────
+        private void ReadFireInput()
+        {
+            _isFiring = false;
+
+            if (Mouse.current != null && Mouse.current.leftButton.isPressed)
+                _isFiring = true;
+
+            if (Gamepad.current != null && Gamepad.current.leftTrigger.isPressed)
+                _isFiring = true;
+        }
+
+        /// <summary>Toggle aim assist on Triangle / Y (gamepad buttonNorth) or T (keyboard).</summary>
+        private void ReadToggleInput()
+        {
+            bool pressed = false;
+
+            if (Gamepad.current != null && Gamepad.current.buttonNorth.wasPressedThisFrame)
+                pressed = true;
+
+            if (Keyboard.current != null && Keyboard.current.tKey.wasPressedThisFrame)
+                pressed = true;
+
+            if (pressed)
+            {
+                _aimAssistEnabled = !_aimAssistEnabled;
+                Debug.Log($"[PlayerShooter] Aim Assist: {(_aimAssistEnabled ? "ON" : "OFF")}");
+            }
+        }
+
+        // ── Aiming ────────────────────────────────────────────────────────────
         private void UpdateAim()
         {
-            // 1. Calculate ideal aim point
-            _currentAimPoint = GetAimPoint(allowAutoAim: true);
+            // 1. Calculate ideal aim point — auto-aim only if toggled ON
+            _currentAimPoint = GetAimPoint(allowAutoAim: _aimAssistEnabled);
 
             // 2. Proximity Check
             _isTooClose = false;
@@ -132,18 +183,6 @@ namespace SpaceShooter.Player
                     }
                 }
             }
-        }
-
-        // ── Input ─────────────────────────────────────────────────────────────
-        private void ReadFireInput()
-        {
-            _isFiring = false;
-
-            if (Mouse.current != null && Mouse.current.leftButton.isPressed)
-                _isFiring = true;
-
-            if (Gamepad.current != null && Gamepad.current.leftTrigger.isPressed)
-                _isFiring = true;
         }
 
         // ── Firing logic ──────────────────────────────────────────────────────
@@ -212,6 +251,8 @@ namespace SpaceShooter.Player
             }
         }
 
+        // ── Auto Aim & Prediction ─────────────────────────────────────────────
+
         /// <summary>
         /// Casts a ray from screen centre (crosshair) into the scene to find an aim point.
         /// Prioritizes Auto-Aim targets within the configured angle if allowed.
@@ -248,23 +289,24 @@ namespace SpaceShooter.Player
 
         /// <summary>
         /// Searches for the most suitable target within the Auto-Aim parameters.
-        /// Uses OverlapSphere for efficiency, then filters by angle, tag, and line of sight.
+        /// Returns a PREDICTED aim point that leads the target based on bullet travel time.
         /// </summary>
         private bool TryFindAutoAimTarget(Ray camRay, out Vector3 targetPosition)
         {
             targetPosition = Vector3.zero;
 
-            // Small allocation-free optimization possible here in the future via OverlapSphereNonAlloc
             Collider[] colliders = Physics.OverlapSphere(transform.position, autoAimRadius);
 
             float bestScore = float.MaxValue;
             bool foundTarget = false;
+            Collider bestCollider = null;
 
             foreach (var col in colliders)
             {
                 if (!col.CompareTag(targetTag)) continue;
 
-                Vector3 dirToTarget = col.bounds.center - camRay.origin;
+                Vector3 currentPos = col.bounds.center;
+                Vector3 dirToTarget = currentPos - camRay.origin;
                 float distToTarget = dirToTarget.magnitude;
 
                 // Check if target is behind camera or beyond aim distance
@@ -283,20 +325,72 @@ namespace SpaceShooter.Player
                     }
                 }
 
-                // Scoring: lower is better. We weight angle heavily so we prioritize objects near the crosshair.
+                // Scoring: lower is better. Angle weighted heavily to prioritize crosshair-near targets.
                 float score = angleToTarget * 10f + distToTarget;
 
                 if (score < bestScore)
                 {
                     bestScore = score;
-                    targetPosition = col.bounds.center;
+                    bestCollider = col;
                     foundTarget = true;
                 }
+            }
+
+            if (foundTarget && bestCollider != null)
+            {
+                targetPosition = GetPredictedPosition(bestCollider, camRay.origin);
             }
 
             return foundTarget;
         }
 
+        /// <summary>
+        /// Computes a predicted aim point for a target, leading it based on:
+        ///   - bullet travel time (distance / bulletSpeed)
+        ///   - target velocity (from its Rigidbody)
+        ///   - distance-based scaling (close targets need less lead)
+        ///   - clamped maximum offset (prevents wild overshoots)
+        ///   - blended with raw position via predictionStrength
+        /// </summary>
+        private Vector3 GetPredictedPosition(Collider targetCollider, Vector3 shooterOrigin)
+        {
+            Vector3 currentPos = targetCollider.bounds.center;
+            float distance = Vector3.Distance(shooterOrigin, currentPos);
+
+            // Get target velocity — if there's no Rigidbody, there's no movement to predict
+            Rigidbody targetRb = targetCollider.attachedRigidbody;
+            if (targetRb == null || _bulletSpeed < 0.01f)
+                return currentPos;
+
+            Vector3 targetVelocity = targetRb.linearVelocity;
+            
+            // If target is barely moving, skip prediction entirely to avoid micro-jitter
+            if (targetVelocity.sqrMagnitude < 0.1f)
+                return currentPos;
+
+            // Estimate bullet travel time
+            float travelTime = distance / _bulletSpeed;
+
+            // Raw predicted offset
+            Vector3 leadOffset = targetVelocity * travelTime;
+
+            // Clamp the lead offset to prevent wild overshoots on very fast targets
+            if (leadOffset.magnitude > maxLeadDistance)
+                leadOffset = leadOffset.normalized * maxLeadDistance;
+
+            // Distance-based scaling: closer targets get less prediction (they need less lead),
+            // far targets get full prediction
+            float distanceFactor = Mathf.Clamp01(distance / Mathf.Max(fullPredictionDistance, 1f));
+
+            // Final blended prediction: lerp between raw position and predicted position
+            // predictionStrength controls the overall assist aggressiveness
+            // distanceFactor scales it down for close-range encounters
+            Vector3 predictedPos = currentPos + leadOffset * (predictionStrength * distanceFactor);
+
+            return predictedPos;
+        }
+
+        // ── Bullet Spawning ───────────────────────────────────────────────────
         private void SpawnBullet(Vector3 position, Vector3 direction)
         {
             // 1. Get from pool — bullet is still DISABLED at this point
@@ -322,5 +416,9 @@ namespace SpaceShooter.Player
             // 5. Enable last — triggers OnEnable → lifetime coroutine starts with correct state
             bulletGO.SetActive(true);
         }
+
+        // ── Public API ────────────────────────────────────────────────────────
+        /// <summary>Whether aim assist is currently active.</summary>
+        public bool AimAssistEnabled => _aimAssistEnabled;
     }
 }

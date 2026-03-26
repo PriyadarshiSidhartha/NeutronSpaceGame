@@ -58,5 +58,16 @@ namespace SpaceShooter.Weapons
         // ── Public API ────────────────────────────────────────────────────────
         public GameObject GetPlayerBullet()  => _playerPool.Get();
         public void ReturnPlayerBullet(GameObject go) => _playerPool.Release(go);
+
+        /// <summary>Returns the speed value configured on the player bullet prefab's Bullet component.</summary>
+        public float PlayerBulletSpeed
+        {
+            get
+            {
+                if (playerBulletPrefab != null && playerBulletPrefab.TryGetComponent<Bullet>(out var bullet))
+                    return bullet.Speed;
+                return 60f; // sensible fallback
+            }
+        }
     }
 }

@@ -66,10 +66,19 @@ namespace SpaceShooter.Player
         // ── Runtime ───────────────────────────────────────────────────────────
         private PlayerShip _playerShip;
         private Camera _cam;
+        
+        // Tracking state
         private Vector3 _smoothedPosition;
-        private Quaternion _smoothedRotation;
-        private Vector3 _smoothedForward;
+        private Vector3 _positionVelocity;
+        
+        private Vector3 _smoothedLookTarget;
+        private Vector3 _lookTargetVelocity;
+        
         private Vector3 _smoothedUp;
+        private Vector3 _upVelocity;
+
+        private Quaternion _smoothedRotation;
+        
         private float _currentPulse;
         private bool _wasThrusting;
         private bool _initialized;
@@ -122,6 +131,11 @@ namespace SpaceShooter.Player
         {
             if (target == null) return;
 
+            // NOTE: We intentionally read target.position / target.forward / target.up here.
+            // Because the ship's Rigidbody uses Interpolation.Interpolate, these transform values
+            // ARE the smoothly interpolated positions at the current render frame rate.
+            // Reading _rb.position directly would bypass interpolation and cause 50Hz stepping jitter.
+
             // Snap to target on the very first frame — no lerp-from-origin pop
             if (!_initialized)
             {
@@ -130,15 +144,16 @@ namespace SpaceShooter.Player
                                     + target.up * heightOffset;
 
                 Vector3 lookTarget = target.position + target.forward * lookAheadDistance;
-                _smoothedForward = (lookTarget - _smoothedPosition).normalized;
+                _smoothedLookTarget = lookTarget;
+                
+                Vector3 initialForward = (_smoothedLookTarget - _smoothedPosition).normalized;
                 _smoothedUp = target.up;
-                _smoothedRotation = Quaternion.LookRotation(_smoothedForward, _smoothedUp);
+                _smoothedRotation = Quaternion.LookRotation(initialForward, _smoothedUp);
 
                 _initialized = true;
             }
 
-            UpdatePosition();
-            UpdateRotation();
+            UpdateTracking();
 
             // Set base position before shake
             transform.position = _smoothedPosition;
@@ -153,36 +168,37 @@ namespace SpaceShooter.Player
         }
 
         // ── Camera logic ──────────────────────────────────────────────────────
-        private void UpdatePosition()
+        private void UpdateTracking()
         {
-            Vector3 desiredPosition =
-                target.position
-                - target.forward * followDistance
-                + target.up      * heightOffset;
+            // Vector3.SmoothDamp uses "smoothTime". The inspector exposes "damping speed" (higher = faster).
+            // We convert the inspector's damping speed to smoothTime approximately (1 / speed = time).
+            float posSmoothTime  = 1f / Mathf.Max(positionDamping, 0.01f);
+            float lookSmoothTime = 1f / Mathf.Max(pitchYawDamping, 0.01f);
+            float rollSmoothTime = 1f / Mathf.Max(rollDamping, 0.01f);
 
-            // Frame-rate independent exponential decay smoothing
-            float t = SmoothFactor(positionDamping, Time.deltaTime);
-            _smoothedPosition = Vector3.Lerp(_smoothedPosition, desiredPosition, t);
-        }
+            // 1. Smooth Position — target.position is already interpolated by Unity at render rate
+            Vector3 desiredPosition = target.position - target.forward * followDistance + target.up * heightOffset;
+            _smoothedPosition = Vector3.SmoothDamp(_smoothedPosition, desiredPosition, ref _positionVelocity, posSmoothTime);
 
-        private void UpdateRotation()
-        {
-            // Desired aim direction and up vector
-            Vector3 lookTarget = target.position + target.forward * lookAheadDistance;
-            Vector3 desiredForward = (lookTarget - _smoothedPosition).normalized;
-            Vector3 desiredUp = target.up;
+            // 2. Smooth Look Target (Aim)
+            // By smoothing the look target point in world space instead of smoothing the "forward vector",
+            // we decouple camera aiming from positional lag.
+            Vector3 desiredLookTarget = target.position + target.forward * lookAheadDistance;
+            _smoothedLookTarget = Vector3.SmoothDamp(_smoothedLookTarget, desiredLookTarget, ref _lookTargetVelocity, lookSmoothTime);
 
-            // Smooth forward (pitch + yaw) and up (roll) independently
-            float aimT  = SmoothFactor(pitchYawDamping, Time.deltaTime);
-            float rollT = SmoothFactor(rollDamping, Time.deltaTime);
+            // 3. Smooth Up Vector (Roll)
+            _smoothedUp = Vector3.SmoothDamp(_smoothedUp, target.up, ref _upVelocity, rollSmoothTime).normalized;
 
-            _smoothedForward = Vector3.Slerp(_smoothedForward, desiredForward, aimT).normalized;
-            _smoothedUp      = Vector3.Slerp(_smoothedUp, desiredUp, rollT).normalized;
-
-            // Re-orthogonalise up against forward to prevent drift
-            _smoothedUp = (Quaternion.LookRotation(_smoothedForward, _smoothedUp) * Vector3.up).normalized;
-
-            _smoothedRotation = Quaternion.LookRotation(_smoothedForward, _smoothedUp);
+            // 4. Derive Rotation
+            Vector3 forwardVec = (_smoothedLookTarget - _smoothedPosition).normalized;
+            
+            // Prevent look rotation failure if vectors perfectly overlap
+            if (forwardVec.sqrMagnitude > 0.01f) 
+            {
+                // Re-orthogonalise up against forward to prevent drift
+                Vector3 finalUp = (Quaternion.LookRotation(forwardVec, _smoothedUp) * Vector3.up).normalized;
+                _smoothedRotation = Quaternion.LookRotation(forwardVec, finalUp);
+            }
         }
 
         private void ApplyShake()
@@ -230,7 +246,12 @@ namespace SpaceShooter.Player
             if (_cam == null) return;
 
             float targetFOV = baseFOV + thrustFOVBoost * _playerShip.ThrustInput;
-            float t = SmoothFactor(fovLerpSpeed, Time.deltaTime);
+            float fovSmoothTime = 1f / Mathf.Max(fovLerpSpeed, 0.01f);
+            
+            // Reusing the SmoothFactor for FOV is fine as it's purely a 1D visual value,
+            // but for consistency we'll use Mathf.Lerp based on our frame-rate robust damping 
+            // logic or just use Mathf.SmoothDamp. We'll use a simple Lerp approach mimicking SmoothDamp's timing.
+            float t = 1f - Mathf.Exp(-fovLerpSpeed * Time.deltaTime);
             _cam.fieldOfView = Mathf.Lerp(_cam.fieldOfView, targetFOV, t);
         }
 
@@ -239,7 +260,7 @@ namespace SpaceShooter.Player
             if (_chromaticAberration == null) return;
 
             float targetIntensity = thrustChromaticAberration * _playerShip.ThrustInput;
-            float t = SmoothFactor(chromaticLerpSpeed, Time.deltaTime);
+            float t = 1f - Mathf.Exp(-chromaticLerpSpeed * Time.deltaTime);
             _chromaticAberration.intensity.value = Mathf.Lerp(
                 _chromaticAberration.intensity.value,
                 targetIntensity,
@@ -256,27 +277,6 @@ namespace SpaceShooter.Player
         public void AddShake(float intensity, float maxIntensity = 1f)
         {
             _currentPulse = Mathf.Min(_currentPulse + intensity, maxIntensity);
-        }
-
-        // ── Utilities ─────────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Returns a frame-rate independent blend factor for use with Lerp/Slerp.
-        ///
-        /// The naive approach <c>Lerp(a, b, speed * deltaTime)</c> is NOT frame-rate
-        /// independent — it converges faster at higher frame rates.
-        ///
-        /// The correct model is exponential decay: each frame, the remaining gap
-        /// shrinks by a fixed *ratio* rather than a fixed *amount*.
-        ///
-        ///   blendFactor = 1 − e^(−speed × Δt)
-        ///
-        /// This gives identical visual results at 30 fps, 60 fps, 144 fps, or any
-        /// variable rate — eliminating a major source of camera jitter.
-        /// </summary>
-        private static float SmoothFactor(float speed, float deltaTime)
-        {
-            return 1f - Mathf.Exp(-speed * deltaTime);
         }
 
         // ── Editor helper — draw the follow gizmo ─────────────────────────────

@@ -42,6 +42,8 @@ namespace SpaceShooter.Player
         [SerializeField][Range(0f, 1f)] private float counterRollMultiplier = 0.3f;
         [Tooltip("Mouse sensitivity multiplier")]
         [SerializeField] private float mouseSensitivity = 0.5f;
+        [Tooltip("Exponential curve for gamepad aiming. Higher values = more precise center, faster edges.")]
+        [SerializeField] private float gamepadAimCurve = 3f;
 
         [Header("Rotation Dynamics")]
         [Tooltip("How fast the ship accelerates into a spin (degrees/sec^2). Higher = snappier attack.")]
@@ -64,6 +66,20 @@ namespace SpaceShooter.Player
         [SerializeField] private float pitchSwayMultiplier = 8f;
         [Tooltip("How fast the sway interpolates")]
         [SerializeField] private float swaySpeed = 5f;
+
+        [Header("Model Shake")]
+        [Tooltip("Constant position/rotation shake intensity while thrusting")]
+        [SerializeField] private float thrustShakeIntensity = 0.02f;
+        [Tooltip("How fast the shake vibrates")]
+        [SerializeField] private float thrustShakeSpeed = 30f;
+        [Tooltip("Initial burst of shake when thrust is first applied")]
+        [SerializeField] private float initialPulseIntensity = 0.1f;
+        [Tooltip("How fast the initial pulse fades out")]
+        [SerializeField] private float pulseDecayRate = 5f;
+        [Tooltip("Multiplier for positional shake against total shake")]
+        [SerializeField] private float shakePositionMultiplier = 1f;
+        [Tooltip("Multiplier for rotational shake against total shake")]
+        [SerializeField] private float shakeRotationMultiplier = 5f;
 
         [Header("Thruster Visuals")]
         [Tooltip("Renderers for the thruster flames")]
@@ -104,6 +120,8 @@ namespace SpaceShooter.Player
         // ── Runtime ───────────────────────────────────────────────────────────
         private Rigidbody _rb;
         private Quaternion _initialModelRot;
+        private Vector3 _initialModelPos;
+        private Quaternion _currentSwayRot;
         private Vector3 _targetVelocity;
         private Vector3 _currentAngularInput; // pitch, yaw, roll per frame
         private Material[] _thrusterMaterials;
@@ -111,6 +129,12 @@ namespace SpaceShooter.Player
         private float _currentParticleLifetime;
         private float _currentParticleAlpha;
         private Material[] _particleMaterials;
+        
+        private float _currentPulse;
+        private bool _wasThrusting;
+        private float _noiseSeedX;
+        private float _noiseSeedY;
+        private float _noiseSeedZ;
 
         // ── Unity lifecycle ───────────────────────────────────────────────────
         private void Awake()
@@ -140,7 +164,16 @@ namespace SpaceShooter.Player
             }
 
             if (shipModel != null)
+            {
                 _initialModelRot = shipModel.localRotation;
+                _currentSwayRot = _initialModelRot;
+                _initialModelPos = shipModel.localPosition;
+            }
+
+            // Generate unique random seeds for shake
+            _noiseSeedX = Random.Range(0f, 1000f);
+            _noiseSeedY = Random.Range(0f, 1000f);
+            _noiseSeedZ = Random.Range(0f, 1000f);
 
             if (thrusterRenderers != null && thrusterRenderers.Length > 0)
             {
@@ -184,6 +217,7 @@ namespace SpaceShooter.Player
         {
             ReadInput();
             ApplySway();
+            ApplyVisualShake();
             UpdateThrusterVisuals();
         }
 
@@ -195,7 +229,7 @@ namespace SpaceShooter.Player
             float strafeBank = -_strafe * swayAmount;
 
             // 2. Yaw right (local angular velocity Y > 0) -> bank right (negative Z)
-            Vector3 localAngularVel = transform.InverseTransformDirection(_rb.angularVelocity);
+            Vector3 localAngularVel = Quaternion.Inverse(_rb.rotation) * _rb.angularVelocity;
             float turnBank = -localAngularVel.y * turnSwayMultiplier;
 
             // 3. Vertical movement -> pitch tilt (up = nose down, down = nose up)
@@ -213,7 +247,50 @@ namespace SpaceShooter.Player
             float totalTargetRoll = Mathf.Clamp(strafeBank + turnBank, -70f, 70f);
 
             Quaternion targetRotation = _initialModelRot * Quaternion.Euler(totalTargetPitch, totalTargetYaw, totalTargetRoll);
-            shipModel.localRotation = Quaternion.Slerp(shipModel.localRotation, targetRotation, Time.deltaTime * swaySpeed);
+            _currentSwayRot = Quaternion.Slerp(_currentSwayRot, targetRotation, Time.deltaTime * swaySpeed);
+        }
+
+        private void ApplyVisualShake()
+        {
+            if (shipModel == null) return;
+
+            bool isThrusting = _thrust > 0.05f;
+
+            if (isThrusting && !_wasThrusting)
+            {
+                _currentPulse = initialPulseIntensity;
+            }
+            _wasThrusting = isThrusting;
+
+            // Decay the pulse
+            _currentPulse = Mathf.MoveTowards(_currentPulse, 0f, pulseDecayRate * Time.deltaTime);
+
+            float activeShake = isThrusting ? (thrustShakeIntensity * _thrust) : 0f;
+            float totalShake = _currentPulse + activeShake;
+
+            if (totalShake > 0.001f)
+            {
+                float time = Time.time * thrustShakeSpeed;
+                Vector3 noise = new Vector3(
+                    Mathf.PerlinNoise(time + _noiseSeedX, _noiseSeedY) - 0.5f,
+                    Mathf.PerlinNoise(_noiseSeedZ, time + _noiseSeedX) - 0.5f,
+                    Mathf.PerlinNoise(time + _noiseSeedY, time + _noiseSeedZ) - 0.5f
+                ) * 2f;
+
+                shipModel.localPosition = _initialModelPos + noise * (totalShake * shakePositionMultiplier);
+                
+                Quaternion shakeRot = Quaternion.Euler(
+                    noise.x * totalShake * shakeRotationMultiplier,
+                    noise.y * totalShake * shakeRotationMultiplier,
+                    noise.z * totalShake * shakeRotationMultiplier
+                );
+                shipModel.localRotation = _currentSwayRot * shakeRot;
+            }
+            else
+            {
+                shipModel.localPosition = _initialModelPos;
+                shipModel.localRotation = _currentSwayRot;
+            }
         }
 
         private void UpdateThrusterVisuals()
@@ -221,7 +298,7 @@ namespace SpaceShooter.Player
             bool isThrusting = _thrust > 0.01f;
             bool isMovingWithoutThrust = Mathf.Abs(_strafe) > 0.01f || Mathf.Abs(_vertical) > 0.01f ||
                                          Mathf.Abs(_stickPitch) > 0.01f || Mathf.Abs(_stickYaw) > 0.01f || Mathf.Abs(_stickRoll) > 0.01f ||
-                                         Mathf.Abs(_mousePitchAccumulated) > 0.01f || Mathf.Abs(_mouseYawAccumulated) > 0.01f;
+                                         Mathf.Abs(_mousePitch) > 0.01f || Mathf.Abs(_mouseYaw) > 0.01f;
 
             // ── Thruster particles (lifetime + alpha) ──────────────────────
             if (thrusterParticles != null && thrusterParticles.Length > 0)
@@ -292,8 +369,11 @@ namespace SpaceShooter.Player
         // Continuous input axes (Keyboard, Gamepad stick)
         private float _stickPitch, _stickYaw, _stickRoll;
 
-        // Accumulated mouse deltas (to sync Update with FixedUpdate without jitter)
-        private float _mousePitchAccumulated, _mouseYawAccumulated;
+        // Mouse input: accumulated deltas reset each Update, read as stable targets by FixedUpdate.
+        // This avoids the two classic pitfalls:
+        //   1. Resetting in FixedUpdate → second tick in same frame sees zero → oscillation
+        //   2. delta/deltaTime → discrete pixel counts amplified into noisy spikes
+        private float _mousePitch, _mouseYaw;
 
         // Tracks which shoulder initiated the roll: +1 = L1 first, -1 = R1 first, 0 = none
         private float _primaryRollDirection;
@@ -323,13 +403,16 @@ namespace SpaceShooter.Player
             }
 
             // ── Mouse ─────────────────────────────────────────────────────────
+            // Reset at the START of each Update. This means all FixedUpdate ticks that ran
+            // between the previous Update and this one read the same stable accumulated value.
+            _mousePitch = 0f;
+            _mouseYaw = 0f;
+            
             if (Mouse.current != null)
             {
                 Vector2 mouseDelta = Mouse.current.delta.ReadValue();
-                // Accumulate mouse deltas to apply them perfectly in fixed intervals without losing input.
-                // Scaled slightly so standard sensitivity feels reasonable against stick input.
-                _mousePitchAccumulated -= mouseDelta.y * mouseSensitivity * 0.1f;
-                _mouseYawAccumulated += mouseDelta.x * mouseSensitivity * 0.1f;
+                _mousePitch = -mouseDelta.y * mouseSensitivity * 0.1f;
+                _mouseYaw = mouseDelta.x * mouseSensitivity * 0.1f;
             }
 
             // ── Gamepad ───────────────────────────────────────────────────────
@@ -338,8 +421,12 @@ namespace SpaceShooter.Player
                 Vector2 leftStick = Gamepad.current.leftStick.ReadValue();
                 Vector2 rightStick = Gamepad.current.rightStick.ReadValue();
 
-                _stickPitch -= rightStick.y;
-                _stickYaw += rightStick.x;
+                // Apply exponential curve to the right stick for fine precision aiming in the center
+                float rx = Mathf.Sign(rightStick.x) * Mathf.Pow(Mathf.Abs(rightStick.x), gamepadAimCurve);
+                float ry = Mathf.Sign(rightStick.y) * Mathf.Pow(Mathf.Abs(rightStick.y), gamepadAimCurve);
+
+                _stickPitch -= ry;
+                _stickYaw += rx;
                 _strafe += leftStick.x;
                 _vertical += leftStick.y;
                 _thrust += Gamepad.current.rightTrigger.ReadValue(); // forward only
@@ -386,8 +473,8 @@ namespace SpaceShooter.Player
                     _thrust * thrustSpeed
                 );
 
-                // Convert desired to world space
-                Vector3 worldDesired = transform.TransformDirection(localDesired);
+                // Convert desired to world space using pure physics rotation instead of interpolated visual rotation
+                Vector3 worldDesired = _rb.rotation * localDesired;
 
                 // Accelerate current velocity toward desired — inertia is preserved in the other axes
                 _rb.linearVelocity = Vector3.MoveTowards(
@@ -405,14 +492,10 @@ namespace SpaceShooter.Player
 
         private void ApplyRotation()
         {
-            // Combine continuous stick/key inputs with raw accumulated mouse deltas
-            float rawPitch = _stickPitch + _mousePitchAccumulated;
-            float rawYaw = _stickYaw + _mouseYawAccumulated;
+            // Combine continuous stick/key inputs with mouse input targets
+            float rawPitch = _stickPitch + _mousePitch;
+            float rawYaw = _stickYaw + _mouseYaw;
             float rawRoll = _stickRoll;
-
-            // Reset mouse accumulators since we're now converting them to rotation this fixed frame
-            _mousePitchAccumulated = 0f;
-            _mouseYawAccumulated = 0f;
 
             bool hasPitch = Mathf.Abs(rawPitch) > 0.001f;
             bool hasYaw = Mathf.Abs(rawYaw) > 0.001f;
@@ -420,8 +503,8 @@ namespace SpaceShooter.Player
 
             if (hasPitch || hasYaw || hasRoll)
             {
-                // Current angular velocity in local space
-                Vector3 localAngularVel = transform.InverseTransformDirection(_rb.angularVelocity);
+                // Current angular velocity in local space (using true physics rotation to prevent interpolation jitter)
+                Vector3 localAngularVel = Quaternion.Inverse(_rb.rotation) * _rb.angularVelocity;
 
                 float radPitchSpeed = pitchYawSpeed * Mathf.Deg2Rad;
                 float radRollSpeed = rollSpeed * Mathf.Deg2Rad;
@@ -440,7 +523,7 @@ namespace SpaceShooter.Player
                     localAngularVel.z = Mathf.MoveTowards(localAngularVel.z, rawRoll * radRollSpeed, accel);
 
                 // Convert back to world space
-                _rb.angularVelocity = transform.TransformDirection(localAngularVel);
+                _rb.angularVelocity = _rb.rotation * localAngularVel;
             }
             // NO ELSE: When there's no input on ALL axes, doing nothing allows _rb.angularDamping (rotationDrag) to naturally sustain/decay the whole spin!
         }
