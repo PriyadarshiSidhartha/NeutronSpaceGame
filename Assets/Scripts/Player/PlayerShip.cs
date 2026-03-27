@@ -473,6 +473,15 @@ namespace SpaceShooter.Player
                     _thrust * thrustSpeed
                 );
 
+                // Prevent diagonal speed boost — cap combined magnitude to the fastest single-axis speed
+                float maxAxisSpeed = Mathf.Max(
+                    Mathf.Abs(_thrust)    * thrustSpeed,
+                    Mathf.Abs(_strafe)    * strafeSpeed,
+                    Mathf.Abs(_vertical)  * verticalSpeed
+                );
+                if (localDesired.sqrMagnitude > maxAxisSpeed * maxAxisSpeed)
+                    localDesired = localDesired.normalized * maxAxisSpeed;
+
                 // Convert desired to world space using pure physics rotation instead of interpolated visual rotation
                 Vector3 worldDesired = _rb.rotation * localDesired;
 
