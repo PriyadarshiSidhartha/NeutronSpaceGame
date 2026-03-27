@@ -74,11 +74,16 @@ namespace SpaceShooter.Player
         private float     _bulletSpeed;       // auto-detected from BulletPool prefab
         private bool      _aimAssistEnabled = true;
 
+        // ── Weapon Powerup Override ───────────────────────────────────────────
+        private Powerups.WeaponPowerupDefinition _weaponOverride;
+        private Powerups.PowerupInventory _powerupInventory;
+
         // ── Unity lifecycle ───────────────────────────────────────────────────
         private void Awake()
         {
             _rb = GetComponent<Rigidbody>();
             _cam = Camera.main;
+            _powerupInventory = GetComponent<Powerups.PowerupInventory>();
 
             if (_cam != null)
                 _spaceCam = _cam.GetComponent<SpaceCameraFollow>();
@@ -191,7 +196,9 @@ namespace SpaceShooter.Player
             _fireTimer += Time.deltaTime;
 
             if (!_isFiring) return;
-            if (_fireTimer < 1f / fireRate) return;   // still on cooldown
+
+            float activeFireRate = _weaponOverride != null ? _weaponOverride.fireRate : fireRate;
+            if (_fireTimer < 1f / activeFireRate) return;   // still on cooldown
 
             _fireTimer = 0f;
             Fire();
@@ -203,7 +210,10 @@ namespace SpaceShooter.Player
         /// </summary>
         private void Fire()
         {
-            if (Weapons.BulletPool.Instance == null)
+            bool hasOverride = _weaponOverride != null;
+
+            // Pool is only needed for default weapon. Override weapons use their own prefab.
+            if (!hasOverride && Weapons.BulletPool.Instance == null)
             {
                 Debug.LogWarning("[PlayerShooter] BulletPool not found in scene!");
                 return;
@@ -213,7 +223,12 @@ namespace SpaceShooter.Player
             if (muzzlePoints == null || muzzlePoints.Length == 0)
             {
                 Vector3 dir = (_currentAimPoint - transform.position).normalized;
-                SpawnBullet(transform.position, dir);
+                if (hasOverride)
+                    SpawnOverrideBullet(transform.position, dir);
+                else
+                    SpawnBullet(transform.position, dir);
+
+                if (hasOverride) _powerupInventory?.NotifyAmmoUsed();
                 return;
             }
 
@@ -234,21 +249,30 @@ namespace SpaceShooter.Player
                 ? transform.forward 
                 : (_currentAimPoint - muzzle.position).normalized;
 
-            if (spreadAngle > 0f)
+            float activeSpread = hasOverride ? _weaponOverride.spreadAngle : spreadAngle;
+            if (activeSpread > 0f)
             {
                 direction = Quaternion.Euler(
-                    Random.Range(-spreadAngle, spreadAngle),
-                    Random.Range(-spreadAngle, spreadAngle),
+                    Random.Range(-activeSpread, activeSpread),
+                    Random.Range(-activeSpread, activeSpread),
                     0f) * direction;
             }
 
-            SpawnBullet(muzzle.position, direction);
+            if (hasOverride)
+                SpawnOverrideBullet(muzzle.position, direction);
+            else
+                SpawnBullet(muzzle.position, direction);
 
             // Screen shake
-            if (_spaceCam != null && fireShakeIntensity > 0f)
+            float activeShake = hasOverride ? _weaponOverride.screenShake : fireShakeIntensity;
+            if (_spaceCam != null && activeShake > 0f)
             {
-                _spaceCam.AddShake(fireShakeIntensity, fireShakeMax);
+                _spaceCam.AddShake(activeShake, fireShakeMax);
             }
+
+            // Notify inventory so it can track ammo
+            if (hasOverride)
+                _powerupInventory?.NotifyAmmoUsed();
         }
 
         // ── Auto Aim & Prediction ─────────────────────────────────────────────
@@ -325,8 +349,8 @@ namespace SpaceShooter.Player
                     }
                 }
 
-                // Scoring: lower is better. Angle weighted heavily to prioritize crosshair-near targets.
-                float score = angleToTarget * 10f + distToTarget;
+                // Scoring: pure angle from crosshair — closest to screen center wins
+                float score = angleToTarget;
 
                 if (score < bestScore)
                 {
@@ -417,8 +441,53 @@ namespace SpaceShooter.Player
             bulletGO.SetActive(true);
         }
 
+        /// <summary>Spawns a bullet using the weapon override's prefab and stats (not from pooling).</summary>
+        private void SpawnOverrideBullet(Vector3 position, Vector3 direction)
+        {
+            if (_weaponOverride == null || _weaponOverride.bulletPrefab == null) return;
+
+            Quaternion visualRot = Quaternion.LookRotation(direction)
+                                   * Quaternion.Euler(_weaponOverride.bulletRotationOffset);
+
+            GameObject bulletGO = Instantiate(_weaponOverride.bulletPrefab, position, visualRot);
+
+            if (bulletGO.TryGetComponent<Weapons.Bullet>(out var bullet))
+                bullet.Initialize(_weaponOverride.damagePerShot,
+                                  inheritedVelocity: _rb != null ? _rb.linearVelocity : Vector3.zero,
+                                  fireDirection: direction);
+        }
+
         // ── Public API ────────────────────────────────────────────────────────
         /// <summary>Whether aim assist is currently active.</summary>
         public bool AimAssistEnabled => _aimAssistEnabled;
+
+        /// <summary>Whether a weapon powerup is currently overriding the default weapon.</summary>
+        public bool HasWeaponOverride => _weaponOverride != null;
+
+        // ── Weapon Override API (called by PowerupInventory) ──────────────────
+        /// <summary>
+        /// Equips a weapon powerup, overriding the default weapon's stats.
+        /// </summary>
+        public void EquipWeapon(Powerups.WeaponPowerupDefinition wpd)
+        {
+            _weaponOverride = wpd;
+            _bulletSpeed = wpd.bulletSpeed; // update for aim prediction
+            _fireTimer = 0f; // allow immediate first shot
+            Debug.Log($"[PlayerShooter] Weapon override equipped: {wpd.displayName}");
+        }
+
+        /// <summary>
+        /// Removes the weapon override, restoring default weapon behaviour.
+        /// </summary>
+        public void UnequipWeapon()
+        {
+            _weaponOverride = null;
+            // Restore original bullet speed for aim prediction
+            if (Weapons.BulletPool.Instance != null)
+                _bulletSpeed = Weapons.BulletPool.Instance.PlayerBulletSpeed;
+            else
+                _bulletSpeed = 60f;
+            Debug.Log("[PlayerShooter] Weapon override removed — default weapon restored.");
+        }
     }
 }

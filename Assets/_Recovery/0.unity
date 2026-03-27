@@ -27623,10 +27623,6 @@ PrefabInstance:
       value: 15
       objectReference: {fileID: 0}
     - target: {fileID: 7158672586625979351, guid: 0f3c0cf1aa82a49efbd5d223ec2563d2, type: 3}
-      propertyPath: obstacleMask.m_Bits
-      value: 55
-      objectReference: {fileID: 0}
-    - target: {fileID: 7158672586625979351, guid: 0f3c0cf1aa82a49efbd5d223ec2563d2, type: 3}
       propertyPath: 'muzzlePoints.Array.data[0]'
       value: 
       objectReference: {fileID: 618224138}
@@ -27762,7 +27758,7 @@ GameObject:
   - component: {fileID: 2121447900148225341}
   m_Layer: 0
   m_Name: gfx
-  m_TagString: Player
+  m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -27877,7 +27873,7 @@ GameObject:
   - component: {fileID: 8051933030683494507}
   m_Layer: 0
   m_Name: body
-  m_TagString: Player
+  m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
