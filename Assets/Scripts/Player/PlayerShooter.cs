@@ -15,6 +15,12 @@ namespace SpaceShooter.Player
         [SerializeField] private Transform[] muzzlePoints;      // assign in Inspector
         [SerializeField] private int damagePerBullet = 20;
 
+        [Header("Default Bullet")]
+        [Tooltip("Travel speed for the default bullet")]
+        [SerializeField] private float bulletSpeed = 60f;
+        [Tooltip("How long the default bullet lives before auto-destroying (seconds)")]
+        [SerializeField] private float bulletLifetime = 4f;
+
         [Header("Muzzle Visuals")]
         [Tooltip("Optional. Visual models to rotate towards the aim point.")]
         [SerializeField] private Transform[] muzzleVisuals;
@@ -71,7 +77,7 @@ namespace SpaceShooter.Player
         private Vector3   _currentAimPoint;
         private bool      _isTooClose;
         private int       _currentMuzzleIndex;
-        private float     _bulletSpeed;       // auto-detected from BulletPool prefab
+        private float     _activeBulletSpeed; // current speed for aim prediction (default or override)
         private bool      _aimAssistEnabled = true;
 
         // ── Weapon Powerup Override ───────────────────────────────────────────
@@ -96,11 +102,7 @@ namespace SpaceShooter.Player
 
         private void Start()
         {
-            // Auto-detect bullet speed from the BulletPool prefab — no need to duplicate the value manually
-            if (Weapons.BulletPool.Instance != null)
-                _bulletSpeed = Weapons.BulletPool.Instance.PlayerBulletSpeed;
-            else
-                _bulletSpeed = 60f; // safe fallback
+            _activeBulletSpeed = bulletSpeed;
         }
 
         private void Update()
@@ -383,7 +385,7 @@ namespace SpaceShooter.Player
 
             // Get target velocity — if there's no Rigidbody, there's no movement to predict
             Rigidbody targetRb = targetCollider.attachedRigidbody;
-            if (targetRb == null || _bulletSpeed < 0.01f)
+            if (targetRb == null || _activeBulletSpeed < 0.01f)
                 return currentPos;
 
             Vector3 targetVelocity = targetRb.linearVelocity;
@@ -393,7 +395,7 @@ namespace SpaceShooter.Player
                 return currentPos;
 
             // Estimate bullet travel time
-            float travelTime = distance / _bulletSpeed;
+            float travelTime = distance / _activeBulletSpeed;
 
             // Raw predicted offset
             Vector3 leadOffset = targetVelocity * travelTime;
@@ -433,7 +435,7 @@ namespace SpaceShooter.Player
             // 4. Initialize: pass the TRUE fire direction separately so physics isn't
             //    affected by the visual rotation offset
             if (bulletGO.TryGetComponent<Weapons.Bullet>(out var bullet))
-                bullet.Initialize(damagePerBullet,
+                bullet.Initialize(damagePerBullet, bulletSpeed, bulletLifetime,
                                   inheritedVelocity: _rb != null ? _rb.linearVelocity : Vector3.zero,
                                   fireDirection: direction);
 
@@ -453,6 +455,7 @@ namespace SpaceShooter.Player
 
             if (bulletGO.TryGetComponent<Weapons.Bullet>(out var bullet))
                 bullet.Initialize(_weaponOverride.damagePerShot,
+                                  _weaponOverride.bulletSpeed, _weaponOverride.bulletLifetime,
                                   inheritedVelocity: _rb != null ? _rb.linearVelocity : Vector3.zero,
                                   fireDirection: direction);
         }
@@ -471,7 +474,7 @@ namespace SpaceShooter.Player
         public void EquipWeapon(Powerups.WeaponPowerupDefinition wpd)
         {
             _weaponOverride = wpd;
-            _bulletSpeed = wpd.bulletSpeed; // update for aim prediction
+            _activeBulletSpeed = wpd.bulletSpeed; // update for aim prediction
             _fireTimer = 0f; // allow immediate first shot
             Debug.Log($"[PlayerShooter] Weapon override equipped: {wpd.displayName}");
         }
@@ -482,11 +485,7 @@ namespace SpaceShooter.Player
         public void UnequipWeapon()
         {
             _weaponOverride = null;
-            // Restore original bullet speed for aim prediction
-            if (Weapons.BulletPool.Instance != null)
-                _bulletSpeed = Weapons.BulletPool.Instance.PlayerBulletSpeed;
-            else
-                _bulletSpeed = 60f;
+            _activeBulletSpeed = bulletSpeed; // restore default for aim prediction
             Debug.Log("[PlayerShooter] Weapon override removed — default weapon restored.");
         }
     }

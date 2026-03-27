@@ -5,19 +5,15 @@ namespace SpaceShooter.Weapons
 {
     /// <summary>
     /// Projectile behaviour. Moves forward at speed, deals damage on collision,
-    /// then returns itself to the bullet pool.
+    /// then destroys itself. Speed and lifetime are injected by the shooter
+    /// via Initialize() — no serialized fields for those values.
     /// </summary>
     [RequireComponent(typeof(Rigidbody))]
     public class Bullet : MonoBehaviour
     {
-        [Header("Movement")]
-        [SerializeField] private float speed  = 60f;
-        [SerializeField] private float lifetime = 4f;
-
-        /// <summary>The bullet's travel speed. Used by aim prediction to estimate travel time.</summary>
-        public float Speed => speed;
-
-        // ── Runtime ───────────────────────────────────────────────────────────
+        // ── Runtime (set via Initialize) ──────────────────────────────────────
+        private float     _speed;
+        private float     _lifetime;
         private int       _damage;
         private Vector3   _inheritedVelocity;   // ship velocity baked in at spawn
         private Vector3   _fireDirection;       // world-space travel direction, decoupled from visual rotation
@@ -34,7 +30,11 @@ namespace SpaceShooter.Weapons
 
         private void OnEnable()
         {
-            _lifetimeCoroutine = StartCoroutine(LifetimeRoutine());
+            // Coroutine starts here (not in Initialize) because pooled bullets
+            // are still inactive when Initialize is called.
+            // _lifetime is guaranteed set by Initialize before SetActive(true).
+            if (_lifetime > 0f)
+                _lifetimeCoroutine = StartCoroutine(LifetimeRoutine());
         }
 
         private void OnDestroy()
@@ -48,8 +48,10 @@ namespace SpaceShooter.Weapons
 
         private void FixedUpdate()
         {
+            if (_fireDirection == Vector3.zero) return;
+
             float forwardBoost = Vector3.Dot(_inheritedVelocity, _fireDirection);
-            _rb.linearVelocity = _fireDirection * (speed + forwardBoost);
+            _rb.linearVelocity = _fireDirection * (_speed + forwardBoost);
 
             // Force the bullet to face its travel direction every frame.
             // This overrides any prefab mesh orientation so the visual is always correct.
@@ -70,24 +72,28 @@ namespace SpaceShooter.Weapons
         }
 
         // ── API ───────────────────────────────────────────────────────────────
-        /// <summary>Called by the shooter to set up the bullet before enabling it.</summary>
-        /// <param name="fireDirection">True world-space travel direction. Pass explicitly so the
-        /// visual rotation (set via transform) can be offset independently.</param>
-        public void Initialize(int damage,
+        /// <summary>
+        /// Called by the shooter to fully configure the bullet before enabling it.
+        /// Speed and lifetime are always provided by the caller (PlayerShooter for
+        /// default bullets, WeaponPowerupDefinition SO for powerup bullets).
+        /// </summary>
+        public void Initialize(int damage, float speed, float lifetime,
                                Vector3 inheritedVelocity = default,
                                Vector3 fireDirection     = default)
         {
             _damage            = damage;
+            _speed             = speed;
+            _lifetime          = lifetime;
             _inheritedVelocity = inheritedVelocity;
-            // Fall back to transform.forward if caller doesn't supply a direction
-            _fireDirection     = (fireDirection == default || fireDirection == Vector3.zero)
-                                 ? transform.forward
-                                 : fireDirection.normalized;
+
+            _fireDirection = (fireDirection == default || fireDirection == Vector3.zero)
+                             ? transform.forward
+                             : fireDirection.normalized;
         }
 
         private IEnumerator LifetimeRoutine()
         {
-            yield return new WaitForSeconds(lifetime);
+            yield return new WaitForSeconds(_lifetime);
             Destroy(gameObject);
         }
     }

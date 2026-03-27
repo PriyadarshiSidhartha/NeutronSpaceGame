@@ -31,6 +31,9 @@ namespace SpaceShooter.Powerups
         [Tooltip("Projectile travel speed")]
         public float bulletSpeed = 80f;
 
+        [Tooltip("How long the bullet lives before auto-destroying (seconds)")]
+        public float bulletLifetime = 4f;
+
         [Tooltip("Euler offset to correct bullet mesh orientation")]
         public Vector3 bulletRotationOffset;
 
