@@ -258,7 +258,7 @@ namespace SpaceShooter.Player
 
             if (isThrusting && !_wasThrusting)
             {
-                _currentPulse = initialPulseIntensity;
+                _currentPulse = Mathf.Max(_currentPulse, initialPulseIntensity);
             }
             _wasThrusting = isThrusting;
 

@@ -15,15 +15,16 @@ MonoBehaviour:
   displayName: LaserGun
   icon: {fileID: 0}
   ammo: 20
-  fireRate: 4
+  fireRate: 12
   spreadAngle: 0
   damagePerShot: 20
   bulletPrefab: {fileID: 3047311978253597339, guid: fd4cbca8d88924aee94b64c624bccc6c, type: 3}
-  bulletSpeed: 1200
+  bulletSpeed: 1000
   bulletLifetime: 4
   bulletRotationOffset: {x: 0, y: 0, z: 0}
   isHeatSeeking: 0
   homingTurnSpeed: 180
   homingSearchRadius: 200
   homingTargetTag: target
-  screenShake: 0.0225
+  screenShake: 0.0125
+  screenShakeMax: 0.03

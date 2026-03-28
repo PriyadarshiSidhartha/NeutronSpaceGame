@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 274234843658698898}
   - component: {fileID: 2846939921520132369}
   m_Layer: 3
-  m_Name: FireBall
+  m_Name: DeathRay
   m_TagString: BulletPool
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -93,7 +93,7 @@ SphereCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Radius: 0.25
+  m_Radius: 0.75
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &3754192989710264501
 GameObject:
@@ -123,7 +123,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.4, y: 0.4, z: 0.4}
+  m_LocalScale: {x: 1.3, y: 1.3, z: 1.3}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2934934522149378326}
@@ -162,7 +162,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 7bc38bc66405749cab0fa1d5a8ef4d6c, type: 2}
+  - {fileID: 2100000, guid: ae22a387e77664047850d2d136b3c8a0, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -244,7 +244,7 @@ TrailRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 7bc38bc66405749cab0fa1d5a8ef4d6c, type: 2}
+  - {fileID: 2100000, guid: ae22a387e77664047850d2d136b3c8a0, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -267,39 +267,39 @@ TrailRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_MaskInteraction: 0
-  m_Time: 0.06
+  m_Time: 0.1
   m_PreviewTimeScale: 1
   m_Parameters:
     serializedVersion: 3
-    widthMultiplier: 0.425
+    widthMultiplier: 1.4
     widthCurve:
       serializedVersion: 2
       m_Curve:
       - serializedVersion: 3
         time: 0
         value: 1
-        inSlope: -0.48140022
-        outSlope: -0.48140022
+        inSlope: -0.22309393
+        outSlope: -0.22309393
         tangentMode: 0
         weightedMode: 0
         inWeight: 0.33333334
-        outWeight: 0.07863501
+        outWeight: 0.10571737
       - serializedVersion: 3
         time: 1
         value: 0
-        inSlope: -0.57776636
-        outSlope: -0.57776636
+        inSlope: -0.5077502
+        outSlope: -0.5077502
         tangentMode: 0
         weightedMode: 0
-        inWeight: 0.068249345
+        inWeight: 0.0826121
         outWeight: 0
       m_PreInfinity: 2
       m_PostInfinity: 2
       m_RotationOrder: 4
     colorGradient:
       serializedVersion: 2
-      key0: {r: 1, g: 1, b: 1, a: 0.047058824}
-      key1: {r: 1, g: 0.5963017, b: 0.3820755, a: 0}
+      key0: {r: 1, g: 1, b: 1, a: 0.0627451}
+      key1: {r: 0.1549929, g: 0.764151, b: 0.17470689, a: 0}
       key2: {r: 0, g: 0, b: 0, a: 0}
       key3: {r: 0, g: 0, b: 0, a: 0}
       key4: {r: 0, g: 0, b: 0, a: 0}
@@ -314,7 +314,7 @@ TrailRenderer:
       ctime5: 0
       ctime6: 0
       ctime7: 0
-      atime0: 193
+      atime0: 0
       atime1: 65535
       atime2: 0
       atime3: 0

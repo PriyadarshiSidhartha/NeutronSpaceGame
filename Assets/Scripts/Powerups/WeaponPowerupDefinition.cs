@@ -51,7 +51,16 @@ namespace SpaceShooter.Powerups
         public string homingTargetTag = "target";
 
         [Header("Juice")]
+        [Tooltip("Spawned at the muzzle point when fired")]
+        public GameObject muzzleFlashPrefab;
+
+        [Tooltip("Spawned at the hit point on impact")]
+        public GameObject impactEffectPrefab;
+
         [Tooltip("Screenshake impulse per shot")]
         public float screenShake = 0.1f;
+
+        [Tooltip("Maximum screenshake from rapid firing")]
+        public float screenShakeMax = 0.2f;
     }
 }

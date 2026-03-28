@@ -10,21 +10,21 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 80b4ceb780945464cbf1c0c2ca7da2bc, type: 3}
-  m_Name: FireBall
+  m_Name: DeathRay
   m_EditorClassIdentifier: Assembly-CSharp::SpaceShooter.Powerups.WeaponPowerupDefinition
-  displayName: FireBall
+  displayName: DeathRay
   icon: {fileID: 0}
-  ammo: 10
-  fireRate: 3
-  spreadAngle: 0.05
-  damagePerShot: 50
-  bulletPrefab: {fileID: 3047311978253597339, guid: 6816260487e154c30bac114c83fc19f4, type: 3}
-  bulletSpeed: 250
+  ammo: 1
+  fireRate: 1
+  spreadAngle: 0
+  damagePerShot: 250
+  bulletPrefab: {fileID: 3047311978253597339, guid: 4137159b982914ee99170a0bf0e706a4, type: 3}
+  bulletSpeed: 2000
   bulletLifetime: 4
   bulletRotationOffset: {x: 0, y: 0, z: 0}
   isHeatSeeking: 0
   homingTurnSpeed: 180
   homingSearchRadius: 200
   homingTargetTag: target
-  screenShake: 0.04
-  screenShakeMax: 0.075
+  screenShake: 0.125
+  screenShakeMax: 0.125

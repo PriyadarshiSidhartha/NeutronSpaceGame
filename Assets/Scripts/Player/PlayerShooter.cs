@@ -62,23 +62,33 @@ namespace SpaceShooter.Player
         [SerializeField] private Vector3 bulletSpawnRotationOffset = Vector3.zero;
 
         [Header("Juice / Feedback")]
+        [Tooltip("Spawned at the muzzle point when fired (default weapon)")]
+        [SerializeField] private GameObject defaultMuzzleFlashPrefab;
+        [Tooltip("Spawned at the hit point on impact (default weapon)")]
+        [SerializeField] private GameObject defaultImpactEffectPrefab;
+        
         [Tooltip("Amount of screenshake impulse added per shot")]
         [SerializeField] private float fireShakeIntensity = 0.05f;
         [Tooltip("Maximum allowed screenshake from rapid firing")]
         [SerializeField] private float fireShakeMax = 0.2f;
 
         // ── Internals ─────────────────────────────────────────────────────────
-        private float     _fireTimer;
-        private bool      _isFiring;
+        private float _fireTimer;
+        private bool _isFiring;
         private Rigidbody _rb;          // ship rigidbody — velocity inherited by bullets
-        private Camera    _cam;
+        private Camera _cam;
         private SpaceCameraFollow _spaceCam;
 
-        private Vector3   _currentAimPoint;
-        private bool      _isTooClose;
-        private int       _currentMuzzleIndex;
-        private float     _activeBulletSpeed; // current speed for aim prediction (default or override)
-        private bool      _aimAssistEnabled = true;
+        private Vector3 _currentAimPoint;
+        private bool _isTooClose;
+        private int _currentMuzzleIndex;
+        private float _activeBulletSpeed; // current speed for aim prediction (default or override)
+        private bool _aimAssistEnabled = true;
+
+        // ── Muzzle Flash Caching ──────────────────────────────────────────────
+        private GameObject _currentMuzzleFlashPrefab;
+        private GameObject[] _activeMuzzleFlashes;
+        private GameObject _fallbackMuzzleFlash;
 
         // ── Weapon Powerup Override ───────────────────────────────────────────
         private Powerups.WeaponPowerupDefinition _weaponOverride;
@@ -161,7 +171,7 @@ namespace SpaceShooter.Player
                     float distToAim = dirToAim.magnitude;
 
                     // Is target point too close, or path blocked?
-                    if (distToAim < minShootDistance || 
+                    if (distToAim < minShootDistance ||
                         Physics.Raycast(muzzle.position, dirToAim.normalized, out _, minShootDistance, obstacleMask))
                     {
                         _isTooClose = true;
@@ -180,7 +190,7 @@ namespace SpaceShooter.Player
 
                     // If too close, look straight forward relative to the ship, otherwise look at aim point
                     Vector3 targetDir = _isTooClose ? transform.forward : (_currentAimPoint - visual.position).normalized;
-                    
+
                     if (targetDir != Vector3.zero)
                     {
                         // Use the visual's parent's up to lock the Z-axis (roll) so the visual doesn't twist relative to its mount
@@ -206,6 +216,77 @@ namespace SpaceShooter.Player
             Fire();
         }
 
+        // ── Muzzle Flash Logic ────────────────────────────────────────────────
+
+        private void UpdateMuzzleFlashes(GameObject newPrefab)
+        {
+            bool structureChanged = (muzzlePoints != null && _activeMuzzleFlashes != null && muzzlePoints.Length != _activeMuzzleFlashes.Length);
+
+            if (_currentMuzzleFlashPrefab == newPrefab && !structureChanged) return;
+
+            // Destroy old ones with buffer time
+            if (_activeMuzzleFlashes != null)
+            {
+                foreach (var oldFlash in _activeMuzzleFlashes)
+                {
+                    if (oldFlash != null) DestroyOldFlash(oldFlash);
+                }
+            }
+            if (_fallbackMuzzleFlash != null)
+            {
+                DestroyOldFlash(_fallbackMuzzleFlash);
+            }
+
+            _currentMuzzleFlashPrefab = newPrefab;
+
+            if (newPrefab == null)
+            {
+                _activeMuzzleFlashes = null;
+                _fallbackMuzzleFlash = null;
+                return;
+            }
+
+            // Instantiate new ones parented to muzzles
+            if (muzzlePoints != null && muzzlePoints.Length > 0)
+            {
+                _activeMuzzleFlashes = new GameObject[muzzlePoints.Length];
+                for(int i = 0; i < muzzlePoints.Length; i++)
+                {
+                    if (muzzlePoints[i] != null)
+                    {
+                        _activeMuzzleFlashes[i] = Instantiate(newPrefab, muzzlePoints[i]);
+                        _activeMuzzleFlashes[i].transform.localPosition = Vector3.zero;
+                        _activeMuzzleFlashes[i].transform.localRotation = Quaternion.identity;
+                    }
+                }
+            }
+            else
+            {
+                _fallbackMuzzleFlash = Instantiate(newPrefab, transform);
+                _fallbackMuzzleFlash.transform.localPosition = Vector3.zero;
+                _fallbackMuzzleFlash.transform.localRotation = Quaternion.identity;
+            }
+        }
+
+        private void DestroyOldFlash(GameObject flashObj)
+        {
+            var ps = flashObj.GetComponentInChildren<ParticleSystem>();
+            if (ps != null)
+            {
+                var emission = ps.emission;
+                emission.enabled = false;
+            }
+            Destroy(flashObj, 2f); // Buffer time to let particles complete before deleting hierarchy
+        }
+
+        private void PlayMuzzleFlash(GameObject flashObj, Vector3 direction)
+        {
+            if (flashObj == null) return;
+            flashObj.transform.rotation = Quaternion.LookRotation(direction);
+            var ps = flashObj.GetComponentInChildren<ParticleSystem>();
+            if (ps != null) ps.Play(true);
+        }
+
         /// <summary>
         /// Determines the world-space aim point from screen centre, then fires
         /// each muzzle's bullet toward that converged point.
@@ -213,6 +294,9 @@ namespace SpaceShooter.Player
         private void Fire()
         {
             bool hasOverride = _weaponOverride != null;
+
+            GameObject activeMuzzleFlashPrefab = hasOverride ? _weaponOverride.muzzleFlashPrefab : defaultMuzzleFlashPrefab;
+            UpdateMuzzleFlashes(activeMuzzleFlashPrefab);
 
             // Pool is only needed for default weapon. Override weapons use their own prefab.
             if (!hasOverride && Weapons.BulletPool.Instance == null)
@@ -225,10 +309,15 @@ namespace SpaceShooter.Player
             if (muzzlePoints == null || muzzlePoints.Length == 0)
             {
                 Vector3 dir = (_currentAimPoint - transform.position).normalized;
+                
+                PlayMuzzleFlash(_fallbackMuzzleFlash, dir);
+
+                GameObject activeImpactEffectFallback = hasOverride ? _weaponOverride.impactEffectPrefab : defaultImpactEffectPrefab;
+
                 if (hasOverride)
-                    SpawnOverrideBullet(transform.position, dir);
+                    SpawnOverrideBullet(transform.position, dir, activeImpactEffectFallback);
                 else
-                    SpawnBullet(transform.position, dir);
+                    SpawnBullet(transform.position, dir, activeImpactEffectFallback);
 
                 if (hasOverride) _powerupInventory?.NotifyAmmoUsed();
                 return;
@@ -247,8 +336,8 @@ namespace SpaceShooter.Player
             if (muzzle == null) return; // All muzzles are null
 
             // Direction: Straight forward if too close, otherwise converge on aim point
-            Vector3 direction = _isTooClose 
-                ? transform.forward 
+            Vector3 direction = _isTooClose
+                ? transform.forward
                 : (_currentAimPoint - muzzle.position).normalized;
 
             float activeSpread = hasOverride ? _weaponOverride.spreadAngle : spreadAngle;
@@ -260,16 +349,25 @@ namespace SpaceShooter.Player
                     0f) * direction;
             }
 
+            // Muzzle Flash
+            if (_activeMuzzleFlashes != null && _activeMuzzleFlashes.Length > _currentMuzzleIndex)
+            {
+                PlayMuzzleFlash(_activeMuzzleFlashes[_currentMuzzleIndex], direction);
+            }
+
+            GameObject activeImpactEffect = hasOverride ? _weaponOverride.impactEffectPrefab : defaultImpactEffectPrefab;
+
             if (hasOverride)
-                SpawnOverrideBullet(muzzle.position, direction);
+                SpawnOverrideBullet(muzzle.position, direction, activeImpactEffect);
             else
-                SpawnBullet(muzzle.position, direction);
+                SpawnBullet(muzzle.position, direction, activeImpactEffect);
 
             // Screen shake
             float activeShake = hasOverride ? _weaponOverride.screenShake : fireShakeIntensity;
+            float activeShakeMax = hasOverride ? _weaponOverride.screenShakeMax : fireShakeMax;
             if (_spaceCam != null && activeShake > 0f)
             {
-                _spaceCam.AddShake(activeShake, fireShakeMax);
+                _spaceCam.AddShake(activeShake, activeShakeMax);
             }
 
             // Notify inventory so it can track ammo
@@ -389,7 +487,7 @@ namespace SpaceShooter.Player
                 return currentPos;
 
             Vector3 targetVelocity = targetRb.linearVelocity;
-            
+
             // If target is barely moving, skip prediction entirely to avoid micro-jitter
             if (targetVelocity.sqrMagnitude < 0.1f)
                 return currentPos;
@@ -417,7 +515,7 @@ namespace SpaceShooter.Player
         }
 
         // ── Bullet Spawning ───────────────────────────────────────────────────
-        private void SpawnBullet(Vector3 position, Vector3 direction)
+        private void SpawnBullet(Vector3 position, Vector3 direction, GameObject impactEffectPrefab)
         {
             // 1. Get from pool — bullet is still DISABLED at this point
             GameObject bulletGO = Weapons.BulletPool.Instance.GetPlayerBullet();
@@ -437,14 +535,15 @@ namespace SpaceShooter.Player
             if (bulletGO.TryGetComponent<Weapons.Bullet>(out var bullet))
                 bullet.Initialize(damagePerBullet, bulletSpeed, bulletLifetime,
                                   inheritedVelocity: _rb != null ? _rb.linearVelocity : Vector3.zero,
-                                  fireDirection: direction);
+                                  fireDirection: direction,
+                                  impactEffectPrefab: impactEffectPrefab);
 
             // 5. Enable last — triggers OnEnable → lifetime coroutine starts with correct state
             bulletGO.SetActive(true);
         }
 
         /// <summary>Spawns a bullet using the weapon override's prefab and stats (not from pooling).</summary>
-        private void SpawnOverrideBullet(Vector3 position, Vector3 direction)
+        private void SpawnOverrideBullet(Vector3 position, Vector3 direction, GameObject impactEffectPrefab)
         {
             if (_weaponOverride == null || _weaponOverride.bulletPrefab == null) return;
 
@@ -457,7 +556,8 @@ namespace SpaceShooter.Player
                 bullet.Initialize(_weaponOverride.damagePerShot,
                                   _weaponOverride.bulletSpeed, _weaponOverride.bulletLifetime,
                                   inheritedVelocity: _rb != null ? _rb.linearVelocity : Vector3.zero,
-                                  fireDirection: direction);
+                                  fireDirection: direction,
+                                  impactEffectPrefab: impactEffectPrefab);
         }
 
         // ── Public API ────────────────────────────────────────────────────────
@@ -475,7 +575,7 @@ namespace SpaceShooter.Player
         {
             _weaponOverride = wpd;
             _activeBulletSpeed = wpd.bulletSpeed; // update for aim prediction
-            _fireTimer = 0f; // allow immediate first shot
+            _fireTimer = float.MaxValue; // ensure the cooldown check passes on first press
             Debug.Log($"[PlayerShooter] Weapon override equipped: {wpd.displayName}");
         }
 

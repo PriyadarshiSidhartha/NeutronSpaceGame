@@ -3,28 +3,45 @@ using UnityEngine;
 namespace SpaceShooter.Powerups
 {
     /// <summary>
-    /// Placed in the world as a trigger collider.
-    /// When the player flies through it, the powerup is added to their first empty slot.
-    /// If all slots are full the pickup is ignored and stays in the world.
+    /// Placed in the world as a destructible object.
+    /// When the player shoots it and destroys it, the powerup is added to their first empty slot.
     /// </summary>
     [RequireComponent(typeof(Collider))]
-    public class PowerupPickup : MonoBehaviour
+    public class PowerupPickup : MonoBehaviour, IHittable
     {
         [Tooltip("The powerup definition asset this pickup grants")]
         [SerializeField] private PowerupDefinition powerupDefinition;
 
-        private void OnTriggerEnter(Collider other)
+        [Tooltip("How much damage is needed to break open this powerup container")]
+        [SerializeField] private int health = 1;
+
+        public void TakeDamage(int damage)
         {
-            if (!other.CompareTag("Player")) return;
-
-            var inventory = other.GetComponent<PowerupInventory>();
-            if (inventory == null) inventory = other.GetComponentInParent<PowerupInventory>();
-
-            if (inventory != null && inventory.TryAddPowerup(powerupDefinition))
+            health -= damage;
+            if (health <= 0)
             {
-                // Pickup consumed — destroy the world object
-                Destroy(gameObject);
+                GrantPowerup();
             }
+        }
+
+        private void GrantPowerup()
+        {
+            // Find the player in the scene
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            if (player != null)
+            {
+                var inventory = player.GetComponent<PowerupInventory>();
+                if (inventory == null) inventory = player.GetComponentInParent<PowerupInventory>();
+
+                if (inventory != null)
+                {
+                    inventory.TryAddPowerup(powerupDefinition);
+                }
+            }
+            
+            // Destroy the container regardless of whether it was successfully picked up, 
+            // since it was logically destroyed by damage.
+            Destroy(gameObject);
         }
     }
 }

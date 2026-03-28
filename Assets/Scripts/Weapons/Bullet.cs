@@ -17,6 +17,7 @@ namespace SpaceShooter.Weapons
         private int       _damage;
         private Vector3   _inheritedVelocity;   // ship velocity baked in at spawn
         private Vector3   _fireDirection;       // world-space travel direction, decoupled from visual rotation
+        private GameObject _impactEffectPrefab;
         private Rigidbody _rb;
         private Coroutine _lifetimeCoroutine;
 
@@ -30,6 +31,7 @@ namespace SpaceShooter.Weapons
 
         private void OnEnable()
         {
+            _hasHit = false;
             // Coroutine starts here (not in Initialize) because pooled bullets
             // are still inactive when Initialize is called.
             // _lifetime is guaranteed set by Initialize before SetActive(true).
@@ -46,22 +48,50 @@ namespace SpaceShooter.Weapons
             }
         }
 
+        private bool _hasHit;
+
         private void FixedUpdate()
         {
             if (_fireDirection == Vector3.zero) return;
 
             float forwardBoost = Vector3.Dot(_inheritedVelocity, _fireDirection);
-            _rb.linearVelocity = _fireDirection * (_speed + forwardBoost);
+            Vector3 currentVelocity = _fireDirection * (_speed + forwardBoost);
+            _rb.linearVelocity = currentVelocity;
 
             // Force the bullet to face its travel direction every frame.
             // This overrides any prefab mesh orientation so the visual is always correct.
             _rb.MoveRotation(Quaternion.LookRotation(_fireDirection));
+
+            // Prevent tunneling: Raycast ahead to see if we'll move completely through an object this frame
+            float distanceThisFrame = currentVelocity.magnitude * Time.fixedDeltaTime;
+            if (Physics.Raycast(transform.position, _fireDirection, out RaycastHit hit, distanceThisFrame, Physics.AllLayers, QueryTriggerInteraction.Collide))
+            {
+                // Manually trigger the hit before the physics engine misses it
+                HandleHit(hit.collider, hit.point, hit.normal);
+            }
         }
 
         private void OnTriggerEnter(Collider other)
         {
+            Vector3 hitPoint = other.ClosestPoint(transform.position);
+            Vector3 hitNormal = -_fireDirection;
+            HandleHit(other, hitPoint, hitNormal);
+        }
+
+        private void HandleHit(Collider other, Vector3 hitPoint, Vector3 hitNormal)
+        {
+            if (_hasHit) return;
+
             // Don't hit the owner's layer (placeholder for multiplayer collision matrix)
             if (other.CompareTag("Player"))  return;
+
+            _hasHit = true;
+
+            if (_impactEffectPrefab != null)
+            {
+                GameObject effect = Instantiate(_impactEffectPrefab, hitPoint, Quaternion.LookRotation(hitNormal));
+                Destroy(effect, 2f);
+            }
 
             if (other.TryGetComponent<IHittable>(out var target))
             {
@@ -79,12 +109,14 @@ namespace SpaceShooter.Weapons
         /// </summary>
         public void Initialize(int damage, float speed, float lifetime,
                                Vector3 inheritedVelocity = default,
-                               Vector3 fireDirection     = default)
+                               Vector3 fireDirection     = default,
+                               GameObject impactEffectPrefab = null)
         {
             _damage            = damage;
             _speed             = speed;
             _lifetime          = lifetime;
             _inheritedVelocity = inheritedVelocity;
+            _impactEffectPrefab = impactEffectPrefab;
 
             _fireDirection = (fireDirection == default || fireDirection == Vector3.zero)
                              ? transform.forward

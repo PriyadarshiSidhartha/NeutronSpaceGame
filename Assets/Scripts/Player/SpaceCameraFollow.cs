@@ -25,15 +25,15 @@ namespace SpaceShooter.Player
         [Tooltip("How far behind the ship the camera sits")]
         [SerializeField] private float followDistance = 12f;
         [Tooltip("How far above the ship's local up axis the camera sits")]
-        [SerializeField] private float heightOffset   = 3f;
+        [SerializeField] private float heightOffset = 3f;
 
         [Header("Smoothing")]
         [Tooltip("Position follow speed — higher = tighter follow")]
-        [SerializeField] private float positionDamping  = 6f;
+        [SerializeField] private float positionDamping = 6f;
         [Tooltip("Pitch & yaw follow speed — higher = snappier aiming")]
-        [SerializeField] private float pitchYawDamping  = 5f;
+        [SerializeField] private float pitchYawDamping = 5f;
         [Tooltip("Roll follow speed — lower = more cinematic, floaty roll")]
-        [SerializeField] private float rollDamping      = 3f;
+        [SerializeField] private float rollDamping = 3f;
 
         [Header("Look-ahead")]
         [Tooltip("How far ahead of the ship the camera looks (depth)")]
@@ -66,19 +66,19 @@ namespace SpaceShooter.Player
         // ── Runtime ───────────────────────────────────────────────────────────
         private PlayerShip _playerShip;
         private Camera _cam;
-        
+
         // Tracking state
         private Vector3 _smoothedPosition;
         private Vector3 _positionVelocity;
-        
+
         private Vector3 _smoothedLookTarget;
         private Vector3 _lookTargetVelocity;
-        
+
         private Vector3 _smoothedUp;
         private Vector3 _upVelocity;
 
         private Quaternion _smoothedRotation;
-        
+
         private float _currentPulse;
         private bool _wasThrusting;
         private bool _initialized;
@@ -145,7 +145,7 @@ namespace SpaceShooter.Player
 
                 Vector3 lookTarget = target.position + target.forward * lookAheadDistance;
                 _smoothedLookTarget = lookTarget;
-                
+
                 Vector3 initialForward = (_smoothedLookTarget - _smoothedPosition).normalized;
                 _smoothedUp = target.up;
                 _smoothedRotation = Quaternion.LookRotation(initialForward, _smoothedUp);
@@ -172,7 +172,7 @@ namespace SpaceShooter.Player
         {
             // Vector3.SmoothDamp uses "smoothTime". The inspector exposes "damping speed" (higher = faster).
             // We convert the inspector's damping speed to smoothTime approximately (1 / speed = time).
-            float posSmoothTime  = 1f / Mathf.Max(positionDamping, 0.01f);
+            float posSmoothTime = 1f / Mathf.Max(positionDamping, 0.01f);
             float lookSmoothTime = 1f / Mathf.Max(pitchYawDamping, 0.01f);
             float rollSmoothTime = 1f / Mathf.Max(rollDamping, 0.01f);
 
@@ -191,9 +191,9 @@ namespace SpaceShooter.Player
 
             // 4. Derive Rotation
             Vector3 forwardVec = (_smoothedLookTarget - _smoothedPosition).normalized;
-            
+
             // Prevent look rotation failure if vectors perfectly overlap
-            if (forwardVec.sqrMagnitude > 0.01f) 
+            if (forwardVec.sqrMagnitude > 0.01f)
             {
                 // Re-orthogonalise up against forward to prevent drift
                 Vector3 finalUp = (Quaternion.LookRotation(forwardVec, _smoothedUp) * Vector3.up).normalized;
@@ -205,10 +205,10 @@ namespace SpaceShooter.Player
         {
             bool isThrusting = _playerShip.ThrustInput > 0.05f;
 
-            // Trigger pulse if we just started thrusting
+            // Trigger pulse if we just started thrusting, but only if it's stronger than the current shake
             if (isThrusting && !_wasThrusting)
             {
-                _currentPulse = initialPulseIntensity;
+                _currentPulse = Mathf.Max(_currentPulse, initialPulseIntensity);
             }
             _wasThrusting = isThrusting;
 
@@ -231,7 +231,7 @@ namespace SpaceShooter.Player
                 ) * 2f;
 
                 transform.position += noise * totalShake;
-                
+
                 // Add a tiny bit of rotational shake for extra impact
                 transform.rotation *= Quaternion.Euler(
                     noise.x * totalShake * 10f,
@@ -247,7 +247,7 @@ namespace SpaceShooter.Player
 
             float targetFOV = baseFOV + thrustFOVBoost * _playerShip.ThrustInput;
             float fovSmoothTime = 1f / Mathf.Max(fovLerpSpeed, 0.01f);
-            
+
             // Reusing the SmoothFactor for FOV is fine as it's purely a 1D visual value,
             // but for consistency we'll use Mathf.Lerp based on our frame-rate robust damping 
             // logic or just use Mathf.SmoothDamp. We'll use a simple Lerp approach mimicking SmoothDamp's timing.
@@ -276,7 +276,10 @@ namespace SpaceShooter.Player
         /// </summary>
         public void AddShake(float intensity, float maxIntensity = 1f)
         {
-            _currentPulse = Mathf.Min(_currentPulse + intensity, maxIntensity);
+            if (_currentPulse < maxIntensity)
+            {
+                _currentPulse = Mathf.Min(_currentPulse + intensity, maxIntensity);
+            }
         }
 
         // ── Editor helper — draw the follow gizmo ─────────────────────────────
