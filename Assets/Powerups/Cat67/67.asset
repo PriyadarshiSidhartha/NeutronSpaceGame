@@ -14,15 +14,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SpaceShooter.Powerups.WeaponPowerupDefinition
   displayName: 67cat
   icon: {fileID: 0}
-  ammo: 10
-  fireRate: 2
-  spreadAngle: 1
-  damagePerShot: 50
-  bulletPrefab: {fileID: 3047311978253597339, guid: 6816260487e154c30bac114c83fc19f4, type: 3}
+  ammo: 25
+  fireRate: 10
+  spreadAngle: 0.5
+  damagePerShot: 15
+  bulletPrefab: {fileID: 3047311978253597339, guid: 81a69fa9172044a6cb3c367d5ecb7332, type: 3}
   bulletSpeed: 80
+  bulletLifetime: 4
   bulletRotationOffset: {x: 0, y: 0, z: 0}
   isHeatSeeking: 0
   homingTurnSpeed: 180
   homingSearchRadius: 200
   homingTargetTag: target
-  screenShake: 0.1
+  muzzleFlashPrefab: {fileID: 0}
+  impactEffectPrefab: {fileID: 0}
+  screenShake: 0.02
+  screenShakeMax: 0.04

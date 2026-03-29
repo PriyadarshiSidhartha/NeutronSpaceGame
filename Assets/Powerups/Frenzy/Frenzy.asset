@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SpaceShooter.Powerups.WeaponPowerupDefinition
   displayName: Frenzy
   icon: {fileID: 0}
-  ammo: 40
-  fireRate: 50
-  spreadAngle: 3
+  ammo: 400
+  fireRate: 200
+  spreadAngle: 2
   damagePerShot: 10
   bulletPrefab: {fileID: 3047311978253597339, guid: c5cb294e4ad754929b2c0ea562d87d00, type: 3}
   bulletSpeed: 200
@@ -26,5 +26,7 @@ MonoBehaviour:
   homingTurnSpeed: 180
   homingSearchRadius: 200
   homingTargetTag: target
+  muzzleFlashPrefab: {fileID: 0}
+  impactEffectPrefab: {fileID: 0}
   screenShake: 0.0125
   screenShakeMax: 0.03

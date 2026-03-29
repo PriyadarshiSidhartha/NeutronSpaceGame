@@ -12,11 +12,11 @@ namespace SpaceShooter.Weapons
     public class Bullet : MonoBehaviour
     {
         // ── Runtime (set via Initialize) ──────────────────────────────────────
-        private float     _speed;
-        private float     _lifetime;
-        private int       _damage;
-        private Vector3   _inheritedVelocity;   // ship velocity baked in at spawn
-        private Vector3   _fireDirection;       // world-space travel direction, decoupled from visual rotation
+        private float _speed;
+        private float _lifetime;
+        private int _damage;
+        private Vector3 _inheritedVelocity;   // ship velocity baked in at spawn
+        private Vector3 _fireDirection;       // world-space travel direction, decoupled from visual rotation
         private GameObject _impactEffectPrefab;
         private Rigidbody _rb;
         private Coroutine _lifetimeCoroutine;
@@ -83,7 +83,7 @@ namespace SpaceShooter.Weapons
             if (_hasHit) return;
 
             // Don't hit the owner's layer (placeholder for multiplayer collision matrix)
-            if (other.CompareTag("Player"))  return;
+            if (other.CompareTag("Player")) return;
 
             _hasHit = true;
 
@@ -109,12 +109,12 @@ namespace SpaceShooter.Weapons
         /// </summary>
         public void Initialize(int damage, float speed, float lifetime,
                                Vector3 inheritedVelocity = default,
-                               Vector3 fireDirection     = default,
+                               Vector3 fireDirection = default,
                                GameObject impactEffectPrefab = null)
         {
-            _damage            = damage;
-            _speed             = speed;
-            _lifetime          = lifetime;
+            _damage = damage;
+            _speed = speed;
+            _lifetime = lifetime;
             _inheritedVelocity = inheritedVelocity;
             _impactEffectPrefab = impactEffectPrefab;
 
